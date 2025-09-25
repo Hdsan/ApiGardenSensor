@@ -6,20 +6,24 @@ app.use(express.json());
 
   let databasesensor1 = [];
   let databasesensor2 = [];
+  let databasesensor3 = [];
+  let databasesensor4 = [];
+  let databaseAirUmidity = [];
 
-app.post('/add', (req, res) => {
-  const { sensor1, sensor2 } = req.body;
+app.post('/', (req, res) => {
+const { sensor1, sensor2, sensor3, sensor4 } = req.body;
 
-  console.log('Item recebido:', sensor1, sensor2);
-  if (!sensor1 || !sensor2) return res.status(400).json({ erro: 'Sensor1 e Sensor2 são obrigatórios' });
+  console.log('Item recebido:', sensor1, sensor2, sensor3, sensor4);
 
   databasesensor1.push({umidity: sensor1, date: new Date()});
   databasesensor2.push({umidity: sensor2, date: new Date()});
+  databasesensor3.push({umidity: sensor3, date: new Date()});
+  databasesensor4.push({umidity: sensor4, date: new Date()});
   res.json({ mensagem: 'Item adicionado com sucesso' });
 });
 
-app.get('/listar', (req, res) => {
-  res.json({ databasesensor1, databasesensor2 });
+app.get('/', (req, res) => {
+  res.json({ databasesensor1, databasesensor2, databasesensor3, databasesensor4 });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
