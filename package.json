@@ -5,7 +5,7 @@
   "main": "main.js",
   "scripts": {
    "start": "node main.js",
-    "setup": "npm install && set DATABASE_URL=%DIRECT_URL% && npx prisma generate && npx prisma migrate deploy"
+    "setup": "npm install && npx prisma generate && npx prisma migrate deploy"
   },
   "type": "module",
   "keywords": [],
