@@ -8,8 +8,8 @@ const storeSensorInfos = async (postBody) => {
     const { plantingBedId, sensor1, sensor2, sensor3, sensor4 } = postBody;
 
     const sensors = await prisma.sensor.findMany({
-      where: { bedId: plantingBedId }, 
-      orderBy: { order: "asc" }, 
+      where: { bedId: plantingBedId },
+      orderBy: { order: "asc" },
     });
 
     const values = [sensor1, sensor2, sensor3, sensor4];
@@ -37,7 +37,21 @@ const validateUmidity = async (sensors) => {
   return true;
 };
 async function getReadInfos() {
-  const sensor = await prisma.read.findMany({});
-  return sensor;
+ const sensors = await prisma.sensor.findMany({
+  where: {
+    bedId: "5d30626c-6855-4462-8b8a-f9226b19e70f",
+  },
+  select: {
+    order: true,
+    reads: {
+      select: {
+        value: true,
+        date: true,
+      },
+    },
+  },
+});
+return sensors;
+
 }
 export default { storeSensorInfos, getReadInfos };
