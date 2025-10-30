@@ -5,14 +5,14 @@ const prisma = new PrismaClient();
 const storeSensorInfos = async (postBody) => {
   try {
     let formattedSensors = [];
-    const { plantingBedId, sensor1, sensor2, sensor3, sensor4 } = postBody;
+    const { plantingBedId, sensor1, sensor2, sensor3, sensor4, salinity, airTemperature, airUmidity } = postBody;
 
     const sensors = await prisma.sensor.findMany({
       where: { bedId: plantingBedId },
       orderBy: { order: "asc" },
     });
 
-    const values = [sensor1, sensor2, sensor3, sensor4];
+    const values = [sensor1, sensor2, sensor3, sensor4,salinity, airTemperature, airUmidity];
 
     const readsToCreate = sensors.map((sensor, i) => ({
       sensorId: sensor.id,
@@ -36,10 +36,10 @@ const validateUmidity = async (sensors) => {
   //TODO: valida a  necessidade de irrigação
   return true;
 };
-async function getReadInfos() {
+async function getReadInfos(bedId) {
  const sensors = await prisma.sensor.findMany({
   where: {
-    bedId: "5d30626c-6855-4462-8b8a-f9226b19e70f",
+    bedId,
   },
   select: {
     order: true,
@@ -48,6 +48,8 @@ async function getReadInfos() {
         value: true,
         date: true,
       },
+      orderBy: { date: 'desc' },
+      take: 1,
     },
   },
 });

@@ -24,6 +24,7 @@ model sensor {
   bedId  String
   order     Int
   bed    plantingBed @relation(fields: [bedId], references: [id])
+  type      String @default("soil_moisture")
   reads  read[]
   events event[]
 }

@@ -15,7 +15,8 @@ router.post("/register", async (req ,res) => {
 });
 
 router.get("/", async (req, res) => {
-  const response = await readServices.getReadInfos();
+  const { bedId } = req.query;
+  const response = await readServices.getReadInfos(bedId);
   res.json(response);
 });
 
