@@ -2,17 +2,50 @@ import pkg from "@prisma/client";
 const { PrismaClient } = pkg;
 const prisma = new PrismaClient();
 
+const storeIrrigationSalinitySensorInfo = async (postBody) => {
+  const { plantingBedId, salinity } = postBody;
+  const salinitySensor = await prisma.sensor.findFirst({
+    where: {
+      bedId: plantingBedId,
+      type: "irrigation_salinity",
+    },
+  });
+
+  if (salinitySensor) {
+    await prisma.read.create({
+      data: {
+        sensorId: salinitySensor.id,
+        value: salinity,
+        date: new Date(),
+      },
+    });
+  }
+};
 const storeSensorInfos = async (postBody) => {
   try {
-    let formattedSensors = [];
-    const { plantingBedId, sensor1, sensor2, sensor3, sensor4, salinity, airTemperature, airUmidity } = postBody;
+    const {
+      plantingBedId,
+      sensor1,
+      sensor2,
+      sensor3,
+      sensor4,
+      airTemperature,
+      airUmidity,
+    } = postBody;
 
     const sensors = await prisma.sensor.findMany({
-      where: { bedId: plantingBedId },
+      where: { bedId: plantingBedId, NOT: { type: "irrigation_salinity" } },
       orderBy: { order: "asc" },
     });
 
-    const values = [sensor1, sensor2, sensor3, sensor4,salinity, airTemperature, airUmidity];
+    const values = [
+      sensor1,
+      sensor2,
+      sensor3,
+      sensor4,
+      airTemperature,
+      airUmidity,
+    ];
 
     const readsToCreate = sensors.map((sensor, i) => ({
       sensorId: sensor.id,
@@ -23,8 +56,9 @@ const storeSensorInfos = async (postBody) => {
     await prisma.read.createMany({
       data: readsToCreate,
     });
+    const sumSensores = sensor1 + sensor2 + sensor3 + sensor4;
 
-    if (await validateUmidity(formattedSensors)) {
+    if (await validateUmidity(sumSensores)) {
       return true;
     }
   } catch (e) {
@@ -32,28 +66,34 @@ const storeSensorInfos = async (postBody) => {
     return false;
   }
 };
-const validateUmidity = async (sensors) => {
-  //TODO: valida a  necessidade de irrigação
+const validateUmidity = async (sumSensores) => {
+  const threshold = 2000; // TODO: definir de acordo com o banco
+  if (sumSensores / 4 < threshold) { //futuramente, mudar de 4 fixo para conforme o número dinamico de sensores
+    return false;
+  }
   return true;
 };
 async function getReadInfos(bedId) {
- const sensors = await prisma.sensor.findMany({
-  where: {
-    bedId,
-  },
-  select: {
-    order: true,
-    reads: {
-      select: {
-        value: true,
-        date: true,
-      },
-      orderBy: { date: 'desc' },
-      take: 1,
+  const sensors = await prisma.sensor.findMany({
+    where: {
+      bedId,
     },
-  },
-});
-return sensors;
-
+    select: {
+      order: true,
+      reads: {
+        select: {
+          value: true,
+          date: true,
+        },
+        orderBy: { date: "desc" },
+        take: 1,
+      },
+    },
+  });
+  return sensors;
 }
-export default { storeSensorInfos, getReadInfos };
+export default {
+  storeSensorInfos,
+  getReadInfos,
+  storeIrrigationSalinitySensorInfo,
+};

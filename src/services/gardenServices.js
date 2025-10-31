@@ -10,7 +10,7 @@ const registerESP32 = async () => {
       { id: uuidv4(), order: 2, type: 'soil_moisture' },
       { id: uuidv4(), order: 3, type: 'soil_moisture' },
       { id: uuidv4(), order: 4, type: 'soil_moisture' },
-      { id: uuidv4(), order: 5, type: 'salinity' },
+      { id: uuidv4(), order: 5, type: 'irrigation_salinity' },
       { id: uuidv4(), order: 6, type: 'airTemperature' },
       { id: uuidv4(), order: 7, type: 'airHumidity' }
     ];
