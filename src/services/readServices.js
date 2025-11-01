@@ -86,10 +86,10 @@ const validateUmidity = async (sumSensores) => {
   console.log("Validando umidade com a media dos sensores:", sumSensores/4);
   const threshold = 2000; // TODO: definir de acordo com o banco
   if ((sumSensores / 4 > threshold) && validateAllowedHour()) { //futuramente, mudar de 4 fixo para conforme o número dinamico de sensores
-    return false;
+    console.log("irrigação permitida")
+    return true;
   }
-  console.log("irrigação permitida")
-  return true;
+  return false;
 };
 async function getReadInfos(bedId) {
   const sensors = await prisma.sensor.findMany({
