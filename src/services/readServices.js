@@ -1,7 +1,7 @@
 import pkg from "@prisma/client";
+import moment from "moment-timezone";
 const { PrismaClient } = pkg;
 const prisma = new PrismaClient();
-
 const storeIrrigationSalinitySensorInfo = async (postBody) => {
   const { plantingBedId, salinity } = postBody;
   const salinitySensor = await prisma.sensor.findFirst({
@@ -16,7 +16,7 @@ const storeIrrigationSalinitySensorInfo = async (postBody) => {
       data: {
         sensorId: salinitySensor.id,
         value: salinity,
-        date: new Date(),
+        date: moment().tz("America/Sao_Paulo").format(),
       },
     });
   }
@@ -50,7 +50,7 @@ const storeSensorInfos = async (postBody) => {
     const readsToCreate = sensors.map((sensor, i) => ({
       sensorId: sensor.id,
       value: values[i],
-      date: new Date(),
+      date: moment().tz("America/Sao_Paulo").format(),
     }));
 
     await prisma.read.createMany({
@@ -67,8 +67,8 @@ const storeSensorInfos = async (postBody) => {
   }
 };
 const validateAllowedHour = () =>{
-  const currentHour = new Date().getHours();
-  if((currentHour >= 5 && currentHour <= 9) ||(currentHour>= 15 && currentHour <=18)){ //TODO: definir de acordo com o banco
+  const currentHour = moment().tz("America/Sao_Paulo").hour();
+  if((currentHour >= 5 && currentHour <= 9) ||(currentHour>= 16 && currentHour <=18)){ //TODO: definir de acordo com o banco
     return true;
   }
   return false;
