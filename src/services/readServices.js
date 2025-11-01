@@ -46,6 +46,8 @@ const storeSensorInfos = async (postBody) => {
       airTemperature,
       airUmidity,
     ];
+  console.log("sensores:")
+  console.log(sensor1, sensor2, sensor3, sensor4);
 
     const readsToCreate = sensors.map((sensor, i) => ({
       sensorId: sensor.id,
@@ -67,6 +69,8 @@ const storeSensorInfos = async (postBody) => {
   }
 };
 const validateAllowedHour = () =>{
+  console.log("Validando horario permitido para irrigação");
+  console.log(moment().tz("America/Sao_Paulo").hour());
   const currentHour = moment().tz("America/Sao_Paulo").hour();
   if((currentHour >= 5 && currentHour <= 9) ||(currentHour>= 16 && currentHour <=18)){ //TODO: definir de acordo com o banco
     return true;
@@ -74,10 +78,12 @@ const validateAllowedHour = () =>{
   return false;
 }
 const validateUmidity = async (sumSensores) => {
+  console.log("Validando umidade com a media dos sensores:", sumSensores/4);
   const threshold = 2000; // TODO: definir de acordo com o banco
   if ((sumSensores / 4 < threshold) && validateAllowedHour()) { //futuramente, mudar de 4 fixo para conforme o número dinamico de sensores
     return false;
   }
+  console.log("irrigação permitida")
   return true;
 };
 async function getReadInfos(bedId) {
