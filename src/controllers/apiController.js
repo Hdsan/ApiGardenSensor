@@ -9,6 +9,11 @@ router.post("/", async (req, res) => {
   res.status(200).json(result);
 });
 
+router.get("/hour", async (req, res) => {  //REMOVER DEPOIS
+  console.log(new Date());
+  res.status(200).json(new Date());
+});
+
 router.post("/irrigation-salinity", async (req, res) => {
   const result = await readServices.storeIrrigationSalinitySensorInfo(req.body);
   res.status(200).json(result);
