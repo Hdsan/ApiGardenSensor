@@ -72,7 +72,7 @@ const validateAllowedHour = () =>{
   console.log("Validando horario permitido para irrigação");
   console.log(moment().tz("America/Sao_Paulo").hour());
   const currentHour = moment().tz("America/Sao_Paulo").hour();
-  if((currentHour >= 5 && currentHour <= 9) ||(currentHour>= 16 && currentHour <=18)){ //TODO: definir de acordo com o banco
+  if((currentHour >= 5 && currentHour <= 9) || (currentHour>= 16 && currentHour <=18)){ //TODO: definir de acordo com o banco
     return true;
   }
   return false;
@@ -80,7 +80,7 @@ const validateAllowedHour = () =>{
 const validateUmidity = async (sumSensores) => {
   console.log("Validando umidade com a media dos sensores:", sumSensores/4);
   const threshold = 2000; // TODO: definir de acordo com o banco
-  if ((sumSensores / 4 < threshold) && validateAllowedHour()) { //futuramente, mudar de 4 fixo para conforme o número dinamico de sensores
+  if ((sumSensores / 4 > threshold) && validateAllowedHour()) { //futuramente, mudar de 4 fixo para conforme o número dinamico de sensores
     return false;
   }
   console.log("irrigação permitida")
