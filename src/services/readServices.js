@@ -66,9 +66,16 @@ const storeSensorInfos = async (postBody) => {
     return false;
   }
 };
+const validateAllowedHour = () =>{
+  const currentHour = new Date().getHours();
+  if((currentHour >= 5 && currentHour <= 9) ||(currentHour>= 15 && currentHour <=18)){ //TODO: definir de acordo com o banco
+    return true;
+  }
+  return false;
+}
 const validateUmidity = async (sumSensores) => {
   const threshold = 2000; // TODO: definir de acordo com o banco
-  if (sumSensores / 4 < threshold) { //futuramente, mudar de 4 fixo para conforme o número dinamico de sensores
+  if ((sumSensores / 4 < threshold) && validateAllowedHour()) { //futuramente, mudar de 4 fixo para conforme o número dinamico de sensores
     return false;
   }
   return true;
