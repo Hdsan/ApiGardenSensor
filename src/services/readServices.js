@@ -23,6 +23,7 @@ const storeIrrigationSalinitySensorInfo = async (postBody) => {
 };
 const storeSensorInfos = async (postBody) => {
   try {
+    console.log("post de sensores")
     const {
       plantingBedId,
       sensor1,
@@ -32,6 +33,10 @@ const storeSensorInfos = async (postBody) => {
       airTemperature,
       airUmidity,
     } = postBody;
+    if ([sensor1, sensor2, sensor3, sensor4].every((v) => v == null)) {
+      console.log("Nenhum dado de sensor de umidade fornecido.");
+      return false;
+    }
 
     const sensors = await prisma.sensor.findMany({
       where: { bedId: plantingBedId, NOT: { type: "irrigation_salinity" } },
