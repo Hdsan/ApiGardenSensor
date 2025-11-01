@@ -2,6 +2,7 @@ import express from 'express';
 const router = express.Router();
 import readServices from "../services/readServices.js";
 import gardenServices from "../services/gardenServices.js";
+import moment from "moment-timezone";
 
 router.post("/", async (req, res) => {
   // const { sensors, plantingBedId } = req.body;
@@ -10,8 +11,8 @@ router.post("/", async (req, res) => {
 });
 
 router.get("/hour", async (req, res) => {  //REMOVER DEPOIS
-  console.log(new Date());
-  res.status(200).json(new Date());
+  console.log(moment().tz("America/Sao_Paulo").format());
+  res.status(200).json(moment().tz("America/Sao_Paulo").format());
 });
 
 router.post("/irrigation-salinity", async (req, res) => {
