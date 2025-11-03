@@ -23,6 +23,7 @@ const storeIrrigationSalinitySensorInfo = async (postBody) => {
 };
 const storeSensorInfos = async (postBody) => {
   try {
+    console.log(moment().tz("America/Sao_Paulo").format());
     console.log("post de sensores");
     console.log(
       ({
@@ -36,7 +37,7 @@ const storeSensorInfos = async (postBody) => {
       } = postBody)
     );
 
-    
+
     const {
       plantingBedId,
       sensor1,
@@ -64,9 +65,6 @@ const storeSensorInfos = async (postBody) => {
       airTemperature,
       airUmidity,
     ];
-    console.log("sensores:");
-    console.log(sensor1, sensor2, sensor3, sensor4);
-
     const readsToCreate = sensors.map((sensor, i) => ({
       sensorId: sensor.id,
       value: values[i],
