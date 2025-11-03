@@ -11,11 +11,6 @@ router.post("/", async (req, res) => {
   res.status(200).json(result);
 });
 
-router.get("/hour", async (req, res) => {  //REMOVER DEPOIS
-  console.log(moment().tz("America/Sao_Paulo").format());
-  res.status(200).json(moment().tz("America/Sao_Paulo").format());
-});
-
 router.post("/irrigation-salinity", async (req, res) => {
   const result = await readServices.storeIrrigationSalinitySensorInfo(req.body);
   console.log("resultado salinidade:", result);

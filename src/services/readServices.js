@@ -23,7 +23,20 @@ const storeIrrigationSalinitySensorInfo = async (postBody) => {
 };
 const storeSensorInfos = async (postBody) => {
   try {
-    console.log("post de sensores")
+    console.log("post de sensores");
+    console.log(
+      ({
+        plantingBedId,
+        sensor1,
+        sensor2,
+        sensor3,
+        sensor4,
+        airTemperature,
+        airUmidity,
+      } = postBody)
+    );
+
+    
     const {
       plantingBedId,
       sensor1,
@@ -51,8 +64,8 @@ const storeSensorInfos = async (postBody) => {
       airTemperature,
       airUmidity,
     ];
-  console.log("sensores:")
-  console.log(sensor1, sensor2, sensor3, sensor4);
+    console.log("sensores:");
+    console.log(sensor1, sensor2, sensor3, sensor4);
 
     const readsToCreate = sensors.map((sensor, i) => ({
       sensorId: sensor.id,
@@ -73,20 +86,25 @@ const storeSensorInfos = async (postBody) => {
     return false;
   }
 };
-const validateAllowedHour = () =>{
+const validateAllowedHour = () => {
   console.log("Validando horario permitido para irrigação");
   console.log(moment().tz("America/Sao_Paulo").hour());
   const currentHour = moment().tz("America/Sao_Paulo").hour();
-  if((currentHour >= 5 && currentHour <= 9) || (currentHour>= 16 && currentHour <=18)){ //TODO: definir de acordo com o banco
+  if (
+    (currentHour >= 5 && currentHour <= 9) ||
+    (currentHour >= 16 && currentHour <= 18)
+  ) {
+    //TODO: definir de acordo com o banco
     return true;
   }
   return false;
-}
+};
 const validateUmidity = async (sumSensores) => {
-  console.log("Validando umidade com a media dos sensores:", sumSensores/4);
+  console.log("Validando umidade com a media dos sensores:", sumSensores / 4);
   const threshold = 2000; // TODO: definir de acordo com o banco
-  if ((sumSensores / 4 > threshold) && validateAllowedHour()) { //futuramente, mudar de 4 fixo para conforme o número dinamico de sensores
-    console.log("irrigação permitida")
+  if (sumSensores / 4 > threshold && validateAllowedHour()) {
+    //futuramente, mudar de 4 fixo para conforme o número dinamico de sensores
+    console.log("irrigação permitida");
     return true;
   }
   return false;
