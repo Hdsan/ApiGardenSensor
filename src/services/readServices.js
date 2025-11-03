@@ -25,19 +25,7 @@ const storeSensorInfos = async (postBody) => {
   try {
     console.log(moment().tz("America/Sao_Paulo").format());
     console.log("post de sensores");
-    console.log(
-      ({
-        plantingBedId,
-        sensor1,
-        sensor2,
-        sensor3,
-        sensor4,
-        airTemperature,
-        airUmidity,
-      } = postBody)
-    );
-
-
+   
     const {
       plantingBedId,
       sensor1,
@@ -47,6 +35,8 @@ const storeSensorInfos = async (postBody) => {
       airTemperature,
       airUmidity,
     } = postBody;
+    
+    console.log(plantingBedId, sensor1, sensor2, sensor3, sensor4, airTemperature, airUmidity);
     if ([sensor1, sensor2, sensor3, sensor4].every((v) => v == null)) {
       console.log("Nenhum dado de sensor de umidade fornecido.");
       return false;
