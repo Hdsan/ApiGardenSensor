@@ -104,6 +104,7 @@ async function getReadInfos(bedId) {
     },
     select: {
       order: true,
+      type: true,
       reads: {
         select: {
           value: true,
