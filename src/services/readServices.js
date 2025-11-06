@@ -20,6 +20,7 @@ const storeIrrigationSalinitySensorInfo = async (postBody) => {
       },
     });
   }
+  return salinity;
 };
 const storeSensorInfos = async (postBody) => {
   try {
@@ -83,13 +84,14 @@ const validateAllowedHour = () => {
     (currentHour >= 16 && currentHour <= 18)
   ) {
     //TODO: definir de acordo com o banco
+    console.log("horario permitido");
     return true;
   }
   return false;
 };
 const validateUmidity = async (sumSensores) => {
   console.log("Validando umidade com a media dos sensores:", sumSensores / 4);
-  const threshold = 2000; // TODO: definir de acordo com o banco
+  const threshold = 1300; // TODO: definir de acordo com o banco
   if (sumSensores / 4 > threshold && validateAllowedHour()) {
     //futuramente, mudar de 4 fixo para conforme o número dinamico de sensores
     console.log("irrigação permitida");
