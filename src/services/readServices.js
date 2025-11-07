@@ -91,7 +91,7 @@ const validateAllowedHour = () => {
 };
 const validateUmidity = async (sumSensores) => {
   console.log("Validando umidade com a media dos sensores:", sumSensores / 4);
-  const threshold = 1300; // TODO: definir de acordo com o banco
+  const threshold = 1400; // TODO: definir de acordo com o banco
   if (sumSensores / 4 > threshold && validateAllowedHour()) {
     //futuramente, mudar de 4 fixo para conforme o número dinamico de sensores
     console.log("irrigação permitida");
