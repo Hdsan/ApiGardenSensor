@@ -48,17 +48,11 @@ const storeSensorInfos = async (postBody) => {
       airUmidity
     );
     if (
-      [sensor1, sensor2, sensor3, sensor4, plantingBedId].every(
+      [sensor1, sensor2, sensor3, sensor4].every(
         (v) => v == null
       )
     ) {
       throw new Error("Nenhum dado de sensor de umidade fornecido.");
-    }
-    const plantingBed = await prisma.plantingBed.findUnique({
-      where: { id: plantingBedId },
-    });
-    if (!plantingBed) {
-      throw new Error("Canteiro de plantio não encontrado.");
     }
 
     const sensors = await prisma.sensor.findMany({

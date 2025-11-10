@@ -1,3 +1,7 @@
+import pkg from "@prisma/client";
+const { PrismaClient } = pkg;
+const prisma = new PrismaClient();
+
 export default function auth(req, res, next) {
   try{
     let plantingBedId;
@@ -7,8 +11,11 @@ export default function auth(req, res, next) {
     } else if (req.method === "GET") {
       plantingBedId = req.query.bedId
     }
+    const plantingBed = prisma.plantingBed.findUnique({
+      where: { id: plantingBedId },
+    });
 
-    if (!plantingBedId || !isUUID(plantingBedId)) {
+    if (!plantingBedId || !isUUID(plantingBedId || plantingBed === null)) {
       return res.status(401).json({ error: "Acesso negado" });
     }
     
