@@ -4,6 +4,7 @@ const { PrismaClient } = pkg;
 const prisma = new PrismaClient();
 const storeIrrigationSalinitySensorInfo = async (postBody) => {
   const { plantingBedId, salinity } = postBody;
+
   const salinitySensor = await prisma.sensor.findFirst({
     where: {
       bedId: plantingBedId,
@@ -26,7 +27,7 @@ const storeSensorInfos = async (postBody) => {
   try {
     console.log(moment().tz("America/Sao_Paulo").format());
     console.log("post de sensores");
-   
+
     const {
       plantingBedId,
       sensor1,
@@ -36,11 +37,28 @@ const storeSensorInfos = async (postBody) => {
       airTemperature,
       airUmidity,
     } = postBody;
-    
-    console.log(plantingBedId, sensor1, sensor2, sensor3, sensor4, airTemperature, airUmidity);
-    if ([sensor1, sensor2, sensor3, sensor4].every((v) => v == null)) {
-      console.log("Nenhum dado de sensor de umidade fornecido.");
-      return false;
+
+    console.log(
+      plantingBedId,
+      sensor1,
+      sensor2,
+      sensor3,
+      sensor4,
+      airTemperature,
+      airUmidity
+    );
+    if (
+      [sensor1, sensor2, sensor3, sensor4, plantingBedId].every(
+        (v) => v == null
+      )
+    ) {
+      throw new Error("Nenhum dado de sensor de umidade fornecido.");
+    }
+    const plantingBed = await prisma.plantingBed.findUnique({
+      where: { id: plantingBedId },
+    });
+    if (!plantingBed) {
+      throw new Error("Canteiro de plantio não encontrado.");
     }
 
     const sensors = await prisma.sensor.findMany({
@@ -67,7 +85,7 @@ const storeSensorInfos = async (postBody) => {
     });
     const sumSensores = sensor1 + sensor2 + sensor3 + sensor4;
 
-    if (await validateUmidity(sumSensores)) {
+    if (await validateUmidity(plantingBedId, sumSensores)) {
       return true;
     }
   } catch (e) {
@@ -75,29 +93,40 @@ const storeSensorInfos = async (postBody) => {
     return false;
   }
 };
-const validateAllowedHour = () => {
+const validateAllowedHour = async (plantingBedId) => {
   console.log("Validando horario permitido para irrigação");
   console.log(moment().tz("America/Sao_Paulo").hour());
   const currentHour = moment().tz("America/Sao_Paulo").hour();
-  if (
-    (currentHour >= 5 && currentHour <= 9) ||
-    (currentHour >= 16 && currentHour <= 18)
-  ) {
-    //TODO: definir de acordo com o banco
-    console.log("horario permitido");
+  const schedules = await prisma.schedule.findMany({
+    where: { bedId: plantingBedId },
+  });
+  const isAllowed = schedules.some(
+    (s) => currentHour >= s.startHour && currentHour <= s.endHour
+  );
+  if (isAllowed) {
+    console.log("Horario permitido para irrigação");
     return true;
   }
   return false;
 };
-const validateUmidity = async (sumSensores) => {
-  console.log("Validando umidade com a media dos sensores:", sumSensores / 4);
-  const threshold = 1400; // TODO: definir de acordo com o banco
-  if (sumSensores / 4 > threshold && validateAllowedHour()) {
-    //futuramente, mudar de 4 fixo para conforme o número dinamico de sensores
-    console.log("irrigação permitida");
-    return true;
+const validateUmidity = async (plantingBedId, sumSensores) => {
+  try {
+    console.log("Validando umidade com a media dos sensores:", sumSensores / 4);
+    const plantingBed = await prisma.plantingBed.findUnique({
+      where: { id: plantingBedId },
+    }); // TODO: definir de acordo com o banco
+    if (
+      sumSensores / 4 > plantingBed.wateringLevel &&
+      (await validateAllowedHour(plantingBedId))
+    ) {
+      console.log("irrigação permitida");
+      return true;
+    }
+    return false;
+  } catch (e) {
+    console.error("Erro ao validar umidade:", e);
+    return false;
   }
-  return false;
 };
 async function getReadInfos(bedId) {
   const sensors = await prisma.sensor.findMany({

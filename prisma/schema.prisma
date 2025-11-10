@@ -17,6 +17,15 @@ datasource db {
 model plantingBed {
  id        String   @id @default(uuid())
   sensors sensor[]
+  wateringLevel Int @default(1500)
+  schedules schedule[]
+}
+model schedule {
+  id        String   @id @default(uuid())
+  bedId  String
+  bed    plantingBed @relation(fields: [bedId], references: [id])
+  startHour Int
+  endHour   Int
 }
 
 model sensor {

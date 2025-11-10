@@ -23,6 +23,21 @@ const registerESP32 = async () => {
         },
       },
     });
+   await prisma.schedule.createMany({
+      data: [
+        {
+          bedId: esp32.id,
+          startHour: 6,
+          endHour: 9
+        },
+        {
+          bedId: esp32.id,
+          startHour: 16,
+          endHour: 18
+        }
+      ]
+   })
+
     return { esp32, sensors };
   } catch (error) {
     console.error("Error registering ESP32:", error);
