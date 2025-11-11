@@ -19,6 +19,7 @@ model plantingBed {
   sensors sensor[]
   wateringLevel Int @default(1500)
   schedules schedule[]
+  events event[]
 }
 model schedule {
   id        String   @id @default(uuid())
@@ -50,6 +51,8 @@ model event {
   id        String   @id @default(uuid())
   date        DateTime @default(now())
   sensorId    String?
+  bedId      String?
+  bed        plantingBed? @relation(fields: [bedId], references: [id])
   sensor      sensor?  @relation(fields: [sensorId], references: [id])
   type        String
   description String?

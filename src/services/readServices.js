@@ -80,6 +80,14 @@ const storeSensorInfos = async (postBody) => {
     const sumSensores = sensor1 + sensor2 + sensor3 + sensor4;
 
     if (await validateUmidity(plantingBedId, sumSensores)) {
+      await prisma.event.create({
+        data: {
+          bedId: plantingBedId,
+          description: "Irrigação acionada por sensor de umidade, média de sensores: " + (sumSensores / 4),
+          type: "irrigation",
+          date: moment().tz("America/Sao_Paulo").format(),
+        },
+      })
       return true;
     }
   } catch (e) {
