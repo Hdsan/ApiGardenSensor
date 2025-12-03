@@ -77,16 +77,19 @@ const storeSensorInfos = async (postBody) => {
     await prisma.read.createMany({
       data: readsToCreate,
     });
-    const sumSensores = sensor1 + sensor2 + sensor3 + sensor4;
+    const sensoresValidos = [sensor1, sensor2, sensor3, sensor4]
+      .filter(v => v < 4095);
+    const sumSensores = sensoresValidos.reduce((sum, v) => sum + v, 0);
+    const numSensoresValidos = sensoresValidos.length;
 
-    if (await validateUmidity(plantingBedId, sumSensores)) {
+    if (await validateUmidity(plantingBedId, sumSensores, numSensoresValidos)) {
       await prisma.event.create({
-        data: {
-          bedId: plantingBedId,
-          description: "Irrigação acionada por sensor de umidade, média de sensores: " + (sumSensores / 4),
-          type: "irrigation",
-          date: moment().tz("America/Sao_Paulo").format(),
-        },
+      data: {
+        bedId: plantingBedId,
+        description: "Irrigação acionada por sensor de umidade, média de sensores: " + (sumSensores / 4),
+        type: "irrigation",
+        date: moment().tz("America/Sao_Paulo").format(),
+      },
       })
       return true;
     }
@@ -111,14 +114,14 @@ const validateAllowedHour = async (plantingBedId) => {
   }
   return false;
 };
-const validateUmidity = async (plantingBedId, sumSensores) => {
+const validateUmidity = async (plantingBedId, sumSensores,numSensoresValidos) => {
   try {
-    console.log("Validando umidade com a media dos sensores:", sumSensores / 4);
+    console.log("Validando umidade com a media dos sensores:", sumSensores / numSensoresValidos);
     const plantingBed = await prisma.plantingBed.findUnique({
       where: { id: plantingBedId },
-    }); // TODO: definir de acordo com o banco
+    }); 
     if (
-      sumSensores / 4 > plantingBed.wateringLevel &&
+      sumSensores / numSensoresValidos > plantingBed.wateringLevel &&
       (await validateAllowedHour(plantingBedId))
     ) {
       console.log("irrigação permitida");
