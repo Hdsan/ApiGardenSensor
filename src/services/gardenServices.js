@@ -6,13 +6,10 @@ const prisma = new PrismaClient();
 const registerESP32 = async () => {
   try {
     const sensors = [
-      { id: uuidv4(), order: 1, type: 'soil_moisture' },
+      { id: uuidv4(), order: 1, type: 'soil_moisture',  },
       { id: uuidv4(), order: 2, type: 'soil_moisture' },
       { id: uuidv4(), order: 3, type: 'soil_moisture' },
       { id: uuidv4(), order: 4, type: 'soil_moisture' },
-      { id: uuidv4(), order: 5, type: 'irrigation_salinity' },
-      { id: uuidv4(), order: 6, type: 'airTemperature' },
-      { id: uuidv4(), order: 7, type: 'airHumidity' }
     ];
 
     const esp32 = await prisma.plantingBed.create({
@@ -26,12 +23,12 @@ const registerESP32 = async () => {
    await prisma.schedule.createMany({
       data: [
         {
-          bedId: esp32.id,
+          bed_id: esp32.id,
           startHour: 6,
           endHour: 9
         },
         {
-          bedId: esp32.id,
+          bed_id: esp32.id,
           startHour: 16,
           endHour: 18
         }

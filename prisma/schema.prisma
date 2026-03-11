@@ -9,51 +9,72 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
-model plantingBed {
- id        String   @id @default(uuid())
-  sensors sensor[]
-  wateringLevel Int @default(1500)
-  schedules schedule[]
-  events event[]
-}
-model schedule {
-  id        String   @id @default(uuid())
-  bedId  String
-  bed    plantingBed @relation(fields: [bedId], references: [id])
-  startHour Int
-  endHour   Int
+model planting_bed {
+  id             String       @id @default(uuid())
+  sensors        sensor[]
+  field_capacity Float          @default(0)
+  volume         Float        @default(0)
+  plant_id       String?
+  plant          crops?       @relation(fields: [plant_id], references: [id])
+  reads          reads[]
+  irrigations    irrigation[]
 }
 
 model sensor {
-  id        String   @id @default(uuid())
-  bedId  String
-  order     Int
-  bed    plantingBed @relation(fields: [bedId], references: [id])
-  type      String @default("soil_moisture")
-  reads  read[]
-  events event[]
+  id                String       @id @default(uuid())
+  bed_id            String
+  order             Int
+  bed               planting_bed @relation(fields: [bed_id], references: [id])
+  type              String       @default("soil_moisture")
+  reads             reads[]
+  dry_reference_adc Int          @default(4095)
+  wet_reference_adc Int          @default(0)
 }
 
-model read {
- id        String   @id @default(uuid())
-  date     DateTime @default(now())
-  sensorId String
-  value    Float
-  sensor   sensor   @relation(fields: [sensorId], references: [id])
+model reads {
+  id        String       @id @default(uuid())
+  date      DateTime     @default(now())
+  sensor_id String
+  bed_id    String
+  bed       planting_bed @relation(fields: [bed_id], references: [id])
+  value     Int
+  raw_value Int
+  sensor    sensor       @relation(fields: [sensor_id], references: [id])
 }
 
-model event {
-  id        String   @id @default(uuid())
-  date        DateTime @default(now())
-  sensorId    String?
-  bedId      String?
-  bed        plantingBed? @relation(fields: [bedId], references: [id])
-  sensor      sensor?  @relation(fields: [sensorId], references: [id])
-  type        String
-  description String?
+model crop_stages {
+  id       String @id @default(uuid())
+  name     String
+  duration Int
+  kc       Float
+  crop_id  String
+  crop     crops  @relation(fields: [crop_id], references: [id])
+}
+
+model crops {
+  id           String         @id @default(uuid())
+  name         String
+  stages       crop_stages[]
+  plantingBeds planting_bed[]
+}
+
+model air_data {
+  id              String   @id @default(uuid())
+  date            DateTime @default(now())
+  air_temperature Float
+  air_humidity    Int
+}
+
+model irrigation {
+  id                  String       @id @default(uuid())
+  date                DateTime     @default(now())
+  bed_id              String
+  water_added        Float
+  irrigation_duration Int
+  bed                 planting_bed @relation(fields: [bed_id], references: [id])
 }
