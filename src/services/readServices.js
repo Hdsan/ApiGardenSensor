@@ -1,5 +1,6 @@
 import pkg from "@prisma/client";
 import moment from "moment-timezone";
+import evapotranspirationServices from "./evapotranspirationServices.js";
 const { PrismaClient } = pkg;
 const prisma = new PrismaClient();
 
@@ -10,17 +11,15 @@ const storeSensorInfos = async (postBody) => {
       sensor1,
       sensor2,
       sensor3,
-      sensor4,
-      airTemperature,
-      airHumidity,
+      sensor4
     } = postBody;
 
-    await prisma.air_data.create({
-      data: {
-        air_temperature: airTemperature,
-        air_humidity: airHumidity,
-      },
-    });
+    // await prisma.air_data.create({
+    //   data: {
+    //     air_temperature: air_temperature,
+    //     air_humidity: air_humidity,
+    //   },
+    // });
 
     if ([sensor1, sensor2, sensor3, sensor4].every((v) => v == null)) {
       throw new Error("Nenhum dado de sensor de umidade fornecido.");
@@ -44,8 +43,9 @@ const storeSensorInfos = async (postBody) => {
 
         let percent = ((dry - raw) / (dry - wet)) * 100;
 
-        // limitar 0–150%
+        // limitar 0–150% - 50 de saturação
         percent = Math.max(0, Math.min(150, percent));
+        percent = Math.round(percent * 100) / 100; // arredondar para 2 casas decimais
 
         return {
           sensor_id: sensor.id,
@@ -60,6 +60,14 @@ const storeSensorInfos = async (postBody) => {
     await prisma.reads.createMany({
       data: readsToCreate,
     });
+
+    const irrigation_miliseconds =
+      await evapotranspirationServices.verifyEvapotranspiration(
+        plantingBedId,
+        readsToCreate,
+      );
+    
+    return irrigation_miliseconds;
   } catch (e) {
     console.error("Erro ao salvar os dados:", e);
     return false;
