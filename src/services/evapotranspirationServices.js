@@ -107,9 +107,9 @@ const predictEvapotranspiration = async (plantingBed, OWPayload) => {
 
 const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
   const now = new Date();
-  if (now.getHours() != 9 || now.getHours() != 18) {
-    return 0;
-  }
+  // if (now.getHours() != 9 || now.getHours() != 18) {
+  //   return 0;
+  // }
   const fc = plantingBed.field_capacity;
   const wp = plantingBed.wilting_point;
   const p = plantingBed.plant.depletion_fraction;
@@ -118,32 +118,33 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
   const TAW = fc - wp;
   const RAW = TAW * p;
 
-  const water_level = water_percent * fc; //agua mm no solo
+  const water_level = water_percent * fc; //agua ml no solo
   const target_water_level = TAW - RAW + wp; //limite inferior da zona de agua disponível pra planta em questão
-  const margin = 0.20 * RAW; //margem de segurança de 20% da água facilmente disponível
-  let necessary_water = (target_water_level + margin) - water_level; //agua necessária pra chegar no limite inferior da zona de água disponível pra planta em questão + margem de segurança
+  const margin = 0.2 * RAW; //margem de segurança de 20% da água facilmente disponível
+  let necessary_water = target_water_level + margin - water_level; //agua necessária pra chegar no limite inferior da zona de água disponível pra planta em questão + margem de segurança
   const addHour = now.getHours() === 9 ? 9 : 15;
 
   const nextPeriodHours = new Date(now);
   nextPeriodHours.setHours(now.getHours() + addHour); // adiciona o valor necessario pra chegar em 9:00 ou 18:00
 
   const lastIrrigationPrediction = await prisma.irrigation.findFirst({
-    where: { bed_id: plantingBedId },
+    where: { bed_id: plantingBed.id },
     orderBy: { date: "desc" },
   });
-  //atualiza o real gasto de etc
-  const realEtc =
-    (water_level - lastIrrigationPrediction.water_before) / plantingBed.area; //diff em mm
-  const waterAfter = water_level;
+  if (lastIrrigationPrediction != null) {
+    //atualiza o real gasto de etc
+    const realEtc =
+      (water_level - lastIrrigationPrediction.water_before) / plantingBed.area; //diff em mm
+    const waterAfter = water_level;
 
-  await prisma.irrigation.update({
-    where: { id: lastIrrigationPrediction.id },
-    data: {
-      real_etc: realEtc,
-      water_after: Math.round(waterAfter),
-    },
-  });
-
+    await prisma.irrigation.update({
+      where: { id: lastIrrigationPrediction.id },
+      data: {
+        real_etc: realEtc,
+        water_after: Math.round(waterAfter),
+      },
+    });
+  }
   // const pastPeriodHours = now.getHours() - (addHour === 9 ? 15 : 9);
 
   if (water_level >= plantingBed.field_capacity) {
@@ -164,7 +165,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
       id: uuidv4(),
       date: new Date(),
       bed: {
-        connect: { id: plantingBedId },
+        connect: { id: plantingBed.id },
       },
       duration: necessary_miliseconds,
       water_added: Math.round(necessary_water),
@@ -177,30 +178,6 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
   });
 
   return necessary_miliseconds > 0 ? necessary_miliseconds : 0;
-  // } else if (now.getHours() == 18) {
-  //   const lastIrrigationPrediction = await prisma.irrigation.findFirst({
-  //     where: { bed_id: plantingBedId },
-  //     orderBy: { date: "desc" },
-  //   });
-
-  //   const realEtc =
-  //     (water_level - lastIrrigationPrediction.water_before) / plantingBed.area; //diff em mm
-  //   const waterAfter = water_level;
-
-  //   await prisma.irrigation.update({
-  //     where: { id: lastIrrigationPrediction.id },
-  //     data: {
-  //       real_etc: realEtc,
-  //       water_after: Math.round(waterAfter),
-  //     },
-  //   });
-  //   // 18:00 verifica a acurácia da estimativa
-  //   const pastPeriodHours = now.getHours() - 9; //calcula evapotranspiração modelo pra irrigação
-
-  //   // ETc gasto no periodo passado 9:00 -18:00
-
-  //   // const predictionETc = // OpenWeather
-  // }
 };
 
 const openWeatherData = async () => {
