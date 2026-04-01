@@ -29,13 +29,24 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
       orderBy: { date: "desc" },
     });
     if (lastEtcPrediction != null) {
-      const lastSensorReads = await prisma.reads.findMany({
+      let lastSensorReads;
+      lastSensorReads = await prisma.reads.findMany({
         where: {
           bed_id: plantingBedId,
         },
         orderBy: { date: "desc" },
+        skip : 4, //decartas as 4 primeiras, porque chegaram agora
         take: 4,
       });
+      if(lastSensorReads.length == 0){
+          lastSensorReads = await prisma.reads.findMany({
+        where: {
+          bed_id: plantingBedId,
+        },
+        orderBy: { date: "desc" },
+        take: 4, //não descarta, porque tem somente 4 registros
+      });
+      }
 
       const avgLastSensorValue =
         lastSensorReads.length > 0
@@ -45,7 +56,7 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
 
       const lastWaterLevel = (avgLastSensorValue / 100) * fc;
 
-      const realEtc = (water_level - lastWaterLevel) / plantingBed.area;
+      const realEtc = (lastWaterLevel - water_level) / plantingBed.area;
 
       await prisma.evapotranspiration.update({
         where: { id: lastEtcPrediction.id },
