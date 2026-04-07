@@ -14,6 +14,8 @@ const storeSensorInfos = async (postBody) => {
       sensor4
     } = postBody;
 
+    console.log("Recebendo: ", postBody);
+
     // await prisma.air_data.create({
     //   data: {
     //     air_temperature: air_temperature,
