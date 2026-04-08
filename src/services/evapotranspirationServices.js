@@ -129,27 +129,27 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
   const TAW = fc - wp;
   const RAW = TAW * p;
 
-  const water_level = water_percent * fc; //agua ml no solo
+  const water_level = parseFloat((water_percent * fc).toFixed(3)) //agua ml no solo
   const target_water_level = TAW - RAW + wp; //limite inferior da zona de agua disponível pra planta em questão
   const margin = 0.2 * RAW; //margem de segurança de 20% da água facilmente disponível
   let necessary_water = target_water_level + margin - water_level; //agua necessária pra chegar no limite inferior da zona de água disponível pra planta em questão + margem de segurança
   const nextPeriodHours = now.getHours() === 9 ? 9 : 15;
 
-  const lastIrrigationPrediction = await prisma.irrigation.findFirst({
+  const lastIrrigation = await prisma.irrigation.findFirst({
     where: { bed_id: plantingBed.id },
     orderBy: { date: "desc" },
   });
-  if (lastIrrigationPrediction != null) {
+  if (lastIrrigation != null) {
     //atualiza o real gasto de etc
     const realEtc =
-      (water_level - lastIrrigationPrediction.water_before) / plantingBed.area; //diff em mm
+      (lastIrrigation.water_before - water_level ) / plantingBed.area; //diff em mm
     const waterAfter = water_level;
 
     await prisma.irrigation.update({
-      where: { id: lastIrrigationPrediction.id },
+      where: { id: lastIrrigation.id },
       data: {
         real_etc: realEtc,
-        water_after: Math.round(waterAfter),
+        water_after: waterAfter,
       },
     });
   }
@@ -176,11 +176,11 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
         connect: { id: plantingBed.id },
       },
       duration: necessary_seconds,
-      water_added: Math.round(necessary_water),
+      water_added: parseFloat(necessary_water.toFixed(3)),
       expected_etc: predictedEtc,
       flow_rate: plantingBed.flow_rate,
       real_etc: null,
-      water_before: Math.round(water_level),
+      water_before: water_level,
       water_after: null,
     },
   });
