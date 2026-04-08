@@ -35,17 +35,17 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
           bed_id: plantingBedId,
         },
         orderBy: { date: "desc" },
-        skip : 4, //decartas as 4 primeiras, porque chegaram agora
+        skip: 4, //decartas as 4 primeiras, porque chegaram agora
         take: 4,
       });
-      if(lastSensorReads.length == 0){
-          lastSensorReads = await prisma.reads.findMany({
-        where: {
-          bed_id: plantingBedId,
-        },
-        orderBy: { date: "desc" },
-        take: 4, //não descarta, porque tem somente 4 registros
-      });
+      if (lastSensorReads.length == 0) {
+        lastSensorReads = await prisma.reads.findMany({
+          where: {
+            bed_id: plantingBedId,
+          },
+          orderBy: { date: "desc" },
+          take: 4, //não descarta, porque tem somente 4 registros
+        });
       }
 
       const avgLastSensorValue =
@@ -118,9 +118,9 @@ const predictEvapotranspiration = async (plantingBed, OWPayload) => {
 
 const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
   const now = new Date();
-  // if (now.getHours() != 9 || now.getHours() != 18) {
-  //   return 0;
-  // }
+  if (now.getHours() != 9 || now.getHours() != 18) {
+    return 0;
+  }
   const fc = plantingBed.field_capacity;
   const wp = plantingBed.wilting_point;
   const p = plantingBed.plant.depletion_fraction;
@@ -165,8 +165,8 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
 
   necessary_water = necessary_water + predictedEtc * plantingBed.area;
   // agua necessária pra irrigar + previsão de evapotranspiração  //em Litros
-  const necessary_miliseconds =
-    Math.ceil(necessary_water * plantingBed.flow_rate) + 1; // milissegundos necessários pra irrigar a quantidade de água necessária + 1 segundo de offset
+  const necessary_seconds =
+    Math.ceil(necessary_water / plantingBed.flow_rate) + 1; // milissegundos necessários pra irrigar a quantidade de água necessária + 1 segundo de offset
 
   await prisma.irrigation.create({
     data: {
@@ -175,7 +175,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
       bed: {
         connect: { id: plantingBed.id },
       },
-      duration: necessary_miliseconds,
+      duration: necessary_seconds,
       water_added: Math.round(necessary_water),
       expected_etc: predictedEtc,
       flow_rate: plantingBed.flow_rate,
@@ -184,7 +184,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
       water_after: null,
     },
   });
-
+  const necessary_miliseconds = necessary_seconds * 1000;
   return necessary_miliseconds > 0 ? necessary_miliseconds : 0;
 };
 
