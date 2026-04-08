@@ -129,7 +129,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
   const TAW = fc - wp;
   const RAW = TAW * p;
 
-  const water_level = parseFloat((water_percent * fc).toFixed(3)) //agua ml no solo
+  const water_level = parseFloat((water_percent * fc).toFixed(3)); //agua ml no solo
   const target_water_level = TAW - RAW + wp; //limite inferior da zona de agua disponível pra planta em questão
   const margin = 0.2 * RAW; //margem de segurança de 20% da água facilmente disponível
   let necessary_water = target_water_level + margin - water_level; //agua necessária pra chegar no limite inferior da zona de água disponível pra planta em questão + margem de segurança
@@ -142,7 +142,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
   if (lastIrrigation != null) {
     //atualiza o real gasto de etc
     const realEtc =
-      (lastIrrigation.water_before - water_level ) / plantingBed.area; //diff em mm
+      (lastIrrigation.water_before - water_level) / plantingBed.area; //diff em mm
     const waterAfter = water_level;
 
     await prisma.irrigation.update({
@@ -154,20 +154,17 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
     });
   }
   // const pastPeriodHours = now.getHours() - (addHour === 9 ? 15 : 9);
+  let necessary_seconds = 0;
 
-  if (water_level >= plantingBed.field_capacity) {
-    return 0; //se o solo já estiver saturado, não é necessário irrigar
+  if (water_level < plantingBed.field_capacity) {
+    necessary_water = necessary_water + predictedEtc * plantingBed.area;    // agua necessária pra irrigar + previsão de evapotranspiração  //em Litros
+    necessary_seconds =
+      Math.ceil(necessary_water / plantingBed.flow_rate) + 1; // milissegundos necessários pra irrigar a quantidade de água necessária + 1 segundo de offset
   }
   const predictedEtc = await predictEvapotranspiration(
     plantingBed,
     OWPayload.hourly.slice(0, nextPeriodHours), // predição de x horas
   ); // mm
-
-  necessary_water = necessary_water + predictedEtc * plantingBed.area;
-  // agua necessária pra irrigar + previsão de evapotranspiração  //em Litros
-  const necessary_seconds =
-    Math.ceil(necessary_water / plantingBed.flow_rate) + 1; // milissegundos necessários pra irrigar a quantidade de água necessária + 1 segundo de offset
-
   await prisma.irrigation.create({
     data: {
       id: uuidv4(),
@@ -184,6 +181,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
       water_after: null,
     },
   });
+  console.log("Água necessária para irrigação (L): ", necessary_water, "Duração necessária para irrigação (s): ", necessary_seconds);
   const necessary_miliseconds = necessary_seconds * 1000;
   return necessary_miliseconds > 0 ? necessary_miliseconds : 0;
 };
