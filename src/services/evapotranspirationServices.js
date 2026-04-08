@@ -133,10 +133,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
   const target_water_level = TAW - RAW + wp; //limite inferior da zona de agua disponível pra planta em questão
   const margin = 0.2 * RAW; //margem de segurança de 20% da água facilmente disponível
   let necessary_water = target_water_level + margin - water_level; //agua necessária pra chegar no limite inferior da zona de água disponível pra planta em questão + margem de segurança
-  const addHour = now.getHours() === 9 ? 9 : 15;
-
-  const nextPeriodHours = new Date(now);
-  nextPeriodHours.setHours(now.getHours() + addHour); // adiciona o valor necessario pra chegar em 9:00 ou 18:00
+  const nextPeriodHours = now.getHours() === 9 ? 9 : 15;
 
   const lastIrrigationPrediction = await prisma.irrigation.findFirst({
     where: { bed_id: plantingBed.id },
@@ -163,7 +160,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
   }
   const predictedEtc = await predictEvapotranspiration(
     plantingBed,
-    OWPayload.hourly.slice(0, nextPeriodHours), // predição de 3 horas
+    OWPayload.hourly.slice(0, nextPeriodHours), // predição de x horas
   ); // mm
 
   necessary_water = necessary_water + predictedEtc * plantingBed.area;
