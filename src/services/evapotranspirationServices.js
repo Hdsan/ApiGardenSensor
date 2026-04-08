@@ -56,7 +56,7 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
 
       const lastWaterLevel = (avgLastSensorValue / 100) * fc;
 
-      const realEtc = (lastWaterLevel - water_level) / plantingBed.area;
+      const realEtc = (water_level - lastWaterLevel) / plantingBed.area;
 
       await prisma.evapotranspiration.update({
         where: { id: lastEtcPrediction.id },
