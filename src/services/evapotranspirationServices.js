@@ -157,33 +157,39 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
   let necessary_seconds = 0;
 
   if (water_level < plantingBed.field_capacity) {
-    necessary_water = necessary_water + predictedEtc * plantingBed.area;    // agua necessária pra irrigar + previsão de evapotranspiração  //em Litros
-    necessary_seconds =
-      Math.ceil(necessary_water / plantingBed.flow_rate) + 1; // milissegundos necessários pra irrigar a quantidade de água necessária + 1 segundo de offset
-  }
-  const predictedEtc = await predictEvapotranspiration(
-    plantingBed,
-    OWPayload.hourly.slice(0, nextPeriodHours), // predição de x horas
-  ); // mm
-  await prisma.irrigation.create({
-    data: {
-      id: uuidv4(),
-      date: new Date(),
-      bed: {
-        connect: { id: plantingBed.id },
+    const predictedEtc = await predictEvapotranspiration(
+      plantingBed,
+      OWPayload.hourly.slice(0, nextPeriodHours), // predição de x horas
+    ); // mm
+    necessary_water = necessary_water + predictedEtc * plantingBed.area; // agua necessária pra irrigar + previsão de evapotranspiração  //em Litros
+    necessary_seconds = Math.ceil(necessary_water / plantingBed.flow_rate) + 1; // milissegundos necessários pra irrigar a quantidade de água necessária + 1 segundo de offset
+
+    await prisma.irrigation.create({
+      data: {
+        id: uuidv4(),
+        date: new Date(),
+        bed: {
+          connect: { id: plantingBed.id },
+        },
+        duration: necessary_seconds,
+        water_added: parseFloat(necessary_water.toFixed(3)),
+        expected_etc: predictedEtc,
+        flow_rate: plantingBed.flow_rate,
+        real_etc: null,
+        water_before: water_level,
+        water_after: null,
       },
-      duration: necessary_seconds,
-      water_added: parseFloat(necessary_water.toFixed(3)),
-      expected_etc: predictedEtc,
-      flow_rate: plantingBed.flow_rate,
-      real_etc: null,
-      water_before: water_level,
-      water_after: null,
-    },
-  });
-  console.log("Água necessária para irrigação (L): ", necessary_water, "Duração necessária para irrigação (s): ", necessary_seconds);
-  const necessary_miliseconds = necessary_seconds * 1000;
-  return necessary_miliseconds > 0 ? necessary_miliseconds : 0;
+    });
+    console.log(
+      "Água necessária para irrigação (L): ",
+      necessary_water,
+      "Duração necessária para irrigação (s): ",
+      necessary_seconds,
+    );
+    const necessary_miliseconds = necessary_seconds * 1000;
+    return necessary_miliseconds > 0 ? necessary_miliseconds : 0;
+  }
+  return 0;
 };
 
 const openWeatherData = async () => {
