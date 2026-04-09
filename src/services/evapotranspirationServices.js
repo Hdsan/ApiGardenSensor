@@ -118,7 +118,13 @@ const predictEvapotranspiration = async (plantingBed, OWPayload) => {
 
 const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
   const now = new Date();
-  if (now.getHours() != 9 && now.getHours() != 18) {
+  const hour = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    hour: "numeric",
+    hour12: false,
+  }).format(now);
+
+  if (Number(hour) !== 9 && Number(hour) !== 18) {
     return 0;
   }
   const fc = plantingBed.field_capacity;
