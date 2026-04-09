@@ -19,7 +19,7 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
     const TAW = fc - wp;
     const RAW = TAW * p;
 
-    const water_level = water_percent * fc; //agua mm no solo
+    const water_level = parseFloat((water_percent * fc).toFixed(4)); //agua mm no solo
 
     const OWPayload = await openWeatherData();
 
@@ -54,7 +54,8 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
             lastSensorReads.length
           : 0;
 
-      const lastWaterLevel = (avgLastSensorValue / 100) * fc;
+      const lastWaterLevel = parseFloat(((avgLastSensorValue / 100) * fc).toFixed(4));
+      
 
       const realEtc = (lastWaterLevel - water_level) / plantingBed.area;
 
