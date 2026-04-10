@@ -59,7 +59,7 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
       );
 
       const realEtc = parseFloat(
-        (((lastWaterLevel - water_level) / plantingBed.area)).toFixed(3)
+        ((lastWaterLevel - water_level) / plantingBed.area).toFixed(3),
       );
 
       await prisma.evapotranspiration.update({
@@ -114,7 +114,7 @@ const predictEvapotranspiration = async (plantingBed, OWPayload) => {
     const Kc = plantingBed.stage.kc;
     const ETc = PeriodETo * Kc;
 
-    return parseFloat((ETc).toFixed(3));
+    return parseFloat(ETc.toFixed(3));
   } catch (err) {
     console.error("Error calculating evapotranspiration:", err);
     throw err;
@@ -137,15 +137,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
     }).format(now);
 
     //ajuste pra considerar os tempo de dessincronização do esp32
-    if (hour === 8 && minute >= 55) {
-      hour = 9;
-      minute = 0;
-    } else if (hour === 17 && minute >= 55) {
-      hour = 18;
-      minute = 0;
-    }
-
-    if (Number(hour) !== 9 && Number(hour) !== 18) {
+    if (!allowedHours(hour, minute)) {
       return 0;
     }
     const fc = plantingBed.field_capacity;
@@ -167,6 +159,9 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
       orderBy: { date: "desc" },
     });
     if (lastIrrigation != null) {
+      console.log(
+        "Atualizando registro de irrigação anterior com dados reais...",
+      );
       //atualiza o real gasto de etc
       const realEtc = parseFloat(
         (
@@ -220,13 +215,27 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
       );
       return necessary_seconds;
     }
+    console.log("Solo saturado, sem necessidade de irrigação.");
     return 0;
   } catch (err) {
     console.error("Erro ao calcular irrigação:", err);
     throw err;
   }
 };
+const allowedHours = (hour, minute) => {
+  // Janela da manhã: 08:55 até 09:59
+  const morningWindow = (hour === 8 && minute >= 55) || hour === 9;
 
+  // Janela da tarde: 17:55 até 18:59
+  const eveningWindow = (hour === 17 && minute >= 55) || hour === 18;
+
+  if (morningWindow || eveningWindow) {
+    return true;
+  }
+
+  console.log(`Hora atual: ${hour}:${minute}, fora do horário de irrigação`);
+  return false;
+};
 const openWeatherData = async () => {
   try {
     const response = await fetch(
