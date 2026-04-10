@@ -122,11 +122,26 @@ const predictEvapotranspiration = async (plantingBed, OWPayload) => {
 const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
   try {
     const now = new Date();
-    const hour = new Intl.DateTimeFormat("pt-BR", {
+    let hour = new Intl.DateTimeFormat("pt-BR", {
       timeZone: "America/Sao_Paulo",
       hour: "numeric",
       hour12: false,
     }).format(now);
+
+    let minute = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      minute: "numeric",
+      hour12: false,
+    }).format(now);
+
+    //ajuste pra considerar os tempo de dessincronização do esp32
+    if (hour === 8 && minute >= 55) {
+      hour = 9;
+      minute = 0;
+    } else if (hour === 17 && minute >= 55) {
+      hour = 18;
+      minute = 0;
+    }
 
     if (Number(hour) !== 9 && Number(hour) !== 18) {
       return 0;
