@@ -137,7 +137,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
     }).format(now);
 
     //ajuste pra considerar os tempo de dessincronização do esp32
-    if (!allowedHours(hour, minute)) {
+    if (!allowedHours(Number(hour), Number(minute))) {
       return 0;
     }
     const fc = plantingBed.field_capacity;
