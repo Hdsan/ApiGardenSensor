@@ -212,8 +212,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
         "Duração necessária para irrigação (s): ",
         necessary_seconds,
       );
-      const necessary_miliseconds = necessary_seconds * 1000;
-      return necessary_miliseconds > 0 ? necessary_miliseconds : 0;
+      return necessary_seconds;
     }
     return 0;
   } catch (err) {
