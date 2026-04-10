@@ -58,7 +58,9 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
         ((avgLastSensorValue / 100) * fc).toFixed(2),
       );
 
-      const realEtc = (lastWaterLevel - water_level) / plantingBed.area;
+      const realEtc = parseFloat(
+        (((lastWaterLevel - water_level) / plantingBed.area)).toFixed(3)
+      );
 
       await prisma.evapotranspiration.update({
         where: { id: lastEtcPrediction.id },
@@ -112,7 +114,7 @@ const predictEvapotranspiration = async (plantingBed, OWPayload) => {
     const Kc = plantingBed.stage.kc;
     const ETc = PeriodETo * Kc;
 
-    return ETc;
+    return parseFloat((ETc).toFixed(3));
   } catch (err) {
     console.error("Error calculating evapotranspiration:", err);
     throw err;
@@ -166,8 +168,12 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
     });
     if (lastIrrigation != null) {
       //atualiza o real gasto de etc
-      const realEtc =
-        (lastIrrigation.water_before - water_level) / plantingBed.area; //diff em mm
+      const realEtc = parseFloat(
+        (
+          (lastIrrigation.water_before - water_level) /
+          plantingBed.area
+        ).toFixed(3),
+      ); //diff em mm
       const waterAfter = water_level;
 
       await prisma.irrigation.update({
