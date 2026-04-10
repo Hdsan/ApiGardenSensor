@@ -54,8 +54,9 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
             lastSensorReads.length
           : 0;
 
-      const lastWaterLevel = parseFloat(((avgLastSensorValue / 100) * fc).toFixed(2));
-      
+      const lastWaterLevel = parseFloat(
+        ((avgLastSensorValue / 100) * fc).toFixed(2),
+      );
 
       const realEtc = (lastWaterLevel - water_level) / plantingBed.area;
 
@@ -73,7 +74,7 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
       OWPayload.hourly.slice(0, 3), // predição de 3 horas
     ); // mm
 
-    await prisma.evapotranspiration.create({
+    const newEtcRecord = await prisma.evapotranspiration.create({
       data: {
         id: uuidv4(),
         date: new Date(),
@@ -84,6 +85,7 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
         real_etc: null,
       },
     });
+    console.log("Previsão de evapotranspiração (mm): ", newEtcRecord);
 
     return await verifyIrrigation(OWPayload, plantingBed, avgSensor);
   } catch (err) {
@@ -118,85 +120,91 @@ const predictEvapotranspiration = async (plantingBed, OWPayload) => {
 };
 
 const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
-  const now = new Date();
-  const hour = new Intl.DateTimeFormat("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-    hour: "numeric",
-    hour12: false,
-  }).format(now);
+  try {
+    const now = new Date();
+    const hour = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      hour: "numeric",
+      hour12: false,
+    }).format(now);
 
-  if (Number(hour) !== 9 && Number(hour) !== 18) {
-    return 0;
-  }
-  const fc = plantingBed.field_capacity;
-  const wp = plantingBed.wilting_point;
-  const p = plantingBed.plant.depletion_fraction;
+    if (Number(hour) !== 9 && Number(hour) !== 18) {
+      return 0;
+    }
+    const fc = plantingBed.field_capacity;
+    const wp = plantingBed.wilting_point;
+    const p = plantingBed.plant.depletion_fraction;
 
-  const water_percent = avgSensor * 0.01;
-  const TAW = fc - wp;
-  const RAW = TAW * p;
+    const water_percent = avgSensor * 0.01;
+    const TAW = fc - wp;
+    const RAW = TAW * p;
 
-  const water_level = parseFloat((water_percent * fc).toFixed(3)); //agua ml no solo
-  const target_water_level = TAW - RAW + wp; //limite inferior da zona de agua disponível pra planta em questão
-  const margin = 0.2 * RAW; //margem de segurança de 20% da água facilmente disponível
-  let necessary_water = target_water_level + margin - water_level; //agua necessária pra chegar no limite inferior da zona de água disponível pra planta em questão + margem de segurança
-  const nextPeriodHours = now.getHours() === 9 ? 9 : 15;
+    const water_level = parseFloat((water_percent * fc).toFixed(3)); //agua ml no solo
+    const target_water_level = TAW - RAW + wp; //limite inferior da zona de agua disponível pra planta em questão
+    const margin = 0.2 * RAW; //margem de segurança de 20% da água facilmente disponível
+    let necessary_water = target_water_level + margin - water_level; //agua necessária pra chegar no limite inferior da zona de água disponível pra planta em questão + margem de segurança
+    const nextPeriodHours = now.getHours() === 9 ? 9 : 15;
 
-  const lastIrrigation = await prisma.irrigation.findFirst({
-    where: { bed_id: plantingBed.id },
-    orderBy: { date: "desc" },
-  });
-  if (lastIrrigation != null) {
-    //atualiza o real gasto de etc
-    const realEtc =
-      (lastIrrigation.water_before - water_level) / plantingBed.area; //diff em mm
-    const waterAfter = water_level;
-
-    await prisma.irrigation.update({
-      where: { id: lastIrrigation.id },
-      data: {
-        real_etc: realEtc,
-        water_after: waterAfter,
-      },
+    const lastIrrigation = await prisma.irrigation.findFirst({
+      where: { bed_id: plantingBed.id },
+      orderBy: { date: "desc" },
     });
-  }
-  // const pastPeriodHours = now.getHours() - (addHour === 9 ? 15 : 9);
-  let necessary_seconds = 0;
+    if (lastIrrigation != null) {
+      //atualiza o real gasto de etc
+      const realEtc =
+        (lastIrrigation.water_before - water_level) / plantingBed.area; //diff em mm
+      const waterAfter = water_level;
 
-  if (water_level < plantingBed.field_capacity) {
-    const predictedEtc = await predictEvapotranspiration(
-      plantingBed,
-      OWPayload.hourly.slice(0, nextPeriodHours), // predição de x horas
-    ); // mm
-    necessary_water = necessary_water + predictedEtc * plantingBed.area; // agua necessária pra irrigar + previsão de evapotranspiração  //em Litros
-    necessary_seconds = Math.ceil(necessary_water / plantingBed.flow_rate) + 1; // milissegundos necessários pra irrigar a quantidade de água necessária + 1 segundo de offset
-
-    await prisma.irrigation.create({
-      data: {
-        id: uuidv4(),
-        date: new Date(),
-        bed: {
-          connect: { id: plantingBed.id },
+      await prisma.irrigation.update({
+        where: { id: lastIrrigation.id },
+        data: {
+          real_etc: realEtc,
+          water_after: waterAfter,
         },
-        duration: necessary_seconds,
-        water_added: parseFloat(necessary_water.toFixed(3)),
-        expected_etc: predictedEtc,
-        flow_rate: plantingBed.flow_rate,
-        real_etc: null,
-        water_before: water_level,
-        water_after: null,
-      },
-    });
-    console.log(
-      "Água necessária para irrigação (L): ",
-      necessary_water,
-      "Duração necessária para irrigação (s): ",
-      necessary_seconds,
-    );
-    const necessary_miliseconds = necessary_seconds * 1000;
-    return necessary_miliseconds > 0 ? necessary_miliseconds : 0;
+      });
+    }
+    // const pastPeriodHours = now.getHours() - (addHour === 9 ? 15 : 9);
+    let necessary_seconds = 0;
+
+    if (water_level < plantingBed.field_capacity) {
+      const predictedEtc = await predictEvapotranspiration(
+        plantingBed,
+        OWPayload.hourly.slice(0, nextPeriodHours), // predição de x horas
+      ); // mm
+      necessary_water = necessary_water + predictedEtc * plantingBed.area; // agua necessária pra irrigar + previsão de evapotranspiração  //em Litros
+      necessary_seconds =
+        Math.ceil(necessary_water / plantingBed.flow_rate) + 1; // milissegundos necessários pra irrigar a quantidade de água necessária + 1 segundo de offset
+
+      await prisma.irrigation.create({
+        data: {
+          id: uuidv4(),
+          date: new Date(),
+          bed: {
+            connect: { id: plantingBed.id },
+          },
+          duration: necessary_seconds,
+          water_added: parseFloat(necessary_water.toFixed(3)),
+          expected_etc: predictedEtc,
+          flow_rate: plantingBed.flow_rate,
+          real_etc: null,
+          water_before: water_level,
+          water_after: null,
+        },
+      });
+      console.log(
+        "Água necessária para irrigação (L): ",
+        necessary_water,
+        "Duração necessária para irrigação (s): ",
+        necessary_seconds,
+      );
+      const necessary_miliseconds = necessary_seconds * 1000;
+      return necessary_miliseconds > 0 ? necessary_miliseconds : 0;
+    }
+    return 0;
+  } catch (err) {
+    console.error("Erro ao calcular irrigação:", err);
+    throw err;
   }
-  return 0;
 };
 
 const openWeatherData = async () => {
@@ -213,30 +221,39 @@ const openWeatherData = async () => {
 };
 
 function penmanMonteithHour({ temp, humidity, wind, rs }) {
-  const gamma = 0.066; //constante psicrométrica, alteração por altitude é irrelevante
-  const albedo = 0.23; //media de albedo, valor aceitável
+  try {
+    const gamma = 0.066; //constante psicrométrica, alteração por altitude é irrelevante
+    const albedo = 0.23; //media de albedo, valor aceitável
 
-  const es = 0.6108 * Math.exp((17.27 * temp) / (temp + 237.3));
-  const ea = es * (humidity / 100);
-  const delta = (4098 * es) / Math.pow(temp + 237.3, 2);
+    const es = 0.6108 * Math.exp((17.27 * temp) / (temp + 237.3));
+    const ea = es * (humidity / 100);
+    const delta = (4098 * es) / Math.pow(temp + 237.3, 2);
 
-  const rn = (1 - albedo) * rs;
-  const g = 0.1 * rn;
+    const rn = (1 - albedo) * rs;
+    const g = 0.1 * rn;
 
-  const num =
-    0.408 * delta * (rn - g) + gamma * (37 / (temp + 273)) * wind * (es - ea);
+    const num =
+      0.408 * delta * (rn - g) + gamma * (37 / (temp + 273)) * wind * (es - ea);
 
-  const den = delta + gamma * (1 + 0.34 * wind);
+    const den = delta + gamma * (1 + 0.34 * wind);
 
-  const mm = Math.max(0, num / den); // mm/h
-  return mm;
+    const mm = Math.max(0, num / den); // mm/h
+    return mm;
+  } catch (err) {
+    console.error("Erro no calculo de Penman-Monteith:", err);
+    return 0;
+  }
 }
 
 function uviToRs(uvi, clouds) {
-  let rs = uvi * 25; // W/m²
-  rs = rs * (1 - clouds / 100);
+  try {
+    let rs = uvi * 25; // W/m²
+    rs = rs * (1 - clouds / 100);
 
-  return rs * 0.0036; // MJ/m²/h
+    return rs * 0.0036; // MJ/m²/h
+  } catch (err) {
+    console.error("Erro no calculo de uvi para Rs:", err);
+    return 0;
+  }
 }
-
 export default { verifyEvapotranspiration };

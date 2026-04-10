@@ -6,14 +6,8 @@ const prisma = new PrismaClient();
 
 const storeSensorInfos = async (postBody) => {
   try {
-    const {
-      plantingBedId,
-      sensor1,
-      sensor2,
-      sensor3,
-      sensor4
-    } = postBody;
-
+    const { plantingBedId, sensor1, sensor2, sensor3, sensor4 } = postBody;
+    console.log(new Date());
     console.log("Recebendo: ", postBody);
 
     // await prisma.air_data.create({
@@ -68,7 +62,7 @@ const storeSensorInfos = async (postBody) => {
         plantingBedId,
         readsToCreate,
       );
-    
+
     return irrigation_miliseconds;
   } catch (e) {
     console.error("Erro ao salvar os dados:", e);
