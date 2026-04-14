@@ -4,6 +4,19 @@ const { PrismaClient } = pkg;
 const prisma = new PrismaClient();
 const verifyEvapotranspiration = async (plantingBedId, reads) => {
   try {
+    const now = new Date();
+    let hour = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      hour: "numeric",
+      hour12: false,
+    }).format(now);
+
+    let minute = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      minute: "numeric",
+      hour12: false,
+    }).format(now);
+
     const avgSensor =
       reads.reduce((sum, read) => sum + read.value, 0) / reads.length;
     const plantingBed = await prisma.planting_bed.findUnique({
@@ -57,10 +70,23 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
       const lastWaterLevel = parseFloat(
         ((avgLastSensorValue / 100) * fc).toFixed(2),
       );
+      let realEtc = 0;
 
-      const realEtc = parseFloat(
-        ((lastWaterLevel - water_level) / plantingBed.area).toFixed(3),
-      );
+      if (IrrigatedSoil(hour, minute)) {
+        //compensar nivel se houve irrigação na ultima verificação, ou seja 12:00 ou 21:00
+        const lastIrrigation = await prisma.irrigation.findFirst({
+          where: { bed_id: plantingBedId },
+          orderBy: { date: "desc" },
+        });
+        const initialVolume = lastIrrigation.water_before + lastIrrigation.water_added;
+        const lostVolume = initialVolume - water_level;
+        realEtc = Math.max(0,parseFloat((lostVolume / plantingBed.area).toFixed(3)));
+      } else {
+        //se não, calcular normalmente
+        realEtc = parseFloat(
+          ((lastWaterLevel - water_level) / plantingBed.area).toFixed(3),
+        );
+      }
 
       await prisma.evapotranspiration.update({
         where: { id: lastEtcPrediction.id },
@@ -89,7 +115,11 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
     });
     console.log("Previsão de evapotranspiração (mm): ", newEtcRecord);
 
-    return await verifyIrrigation(OWPayload, plantingBed, avgSensor);
+    //ajuste pra considerar os tempo de dessincronização do esp32
+    if (allowedHours(Number(hour), Number(minute))) {
+      return await verifyIrrigation(OWPayload, plantingBed, avgSensor);
+    }
+    return 0;
   } catch (err) {
     console.log("Erro ao calcular ETc: ", err);
     throw err;
@@ -123,23 +153,6 @@ const predictEvapotranspiration = async (plantingBed, OWPayload) => {
 
 const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
   try {
-    const now = new Date();
-    let hour = new Intl.DateTimeFormat("pt-BR", {
-      timeZone: "America/Sao_Paulo",
-      hour: "numeric",
-      hour12: false,
-    }).format(now);
-
-    let minute = new Intl.DateTimeFormat("pt-BR", {
-      timeZone: "America/Sao_Paulo",
-      minute: "numeric",
-      hour12: false,
-    }).format(now);
-
-    //ajuste pra considerar os tempo de dessincronização do esp32
-    if (!allowedHours(Number(hour), Number(minute))) {
-      return 0;
-    }
     const fc = plantingBed.field_capacity;
     const wp = plantingBed.wilting_point;
     const p = plantingBed.plant.depletion_fraction;
@@ -162,13 +175,11 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
       console.log(
         "Atualizando registro de irrigação anterior com dados reais...",
       );
+      const initialVolume = lastIrrigation.water_before + lastIrrigation.water_added;
+      const lostVolume = initialVolume - water_level;
+      const realEtc = Math.max(0, parseFloat((lostVolume / plantingBed.area).toFixed(3)));
       //atualiza o real gasto de etc
-      const realEtc = parseFloat(
-        (
-          (lastIrrigation.water_before - water_level) /
-          plantingBed.area
-        ).toFixed(3),
-      ); //diff em mm
+      
       const waterAfter = water_level;
 
       await prisma.irrigation.update({
@@ -188,8 +199,9 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
         OWPayload.hourly.slice(0, nextPeriodHours), // predição de x horas
       ); // mm
       necessary_water = necessary_water + predictedEtc * plantingBed.area; // agua necessária pra irrigar + previsão de evapotranspiração  //em Litros
-      necessary_seconds =
-       parseFloat((necessary_water / plantingBed.flow_rate).toFixed(2)); // milissegundos necessários pra irrigar a quantidade de água necessária + 1 segundo de offset
+      necessary_seconds = parseFloat(
+        (necessary_water / plantingBed.flow_rate).toFixed(2),
+      ); // milissegundos necessários pra irrigar a quantidade de água necessária + 1 segundo de offset
 
       await prisma.irrigation.create({
         data: {
@@ -221,6 +233,20 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
     console.error("Erro ao calcular irrigação:", err);
     throw err;
   }
+};
+const IrrigatedSoil = (hour, minute) => {
+  // Janela da manhã: 08:55 até 09:59
+  const morningIrrigation = (hour === 11 && minute >= 55) || hour === 12;
+
+  // Janela da tarde: 17:55 até 18:59
+  const eveningIrrigation = (hour === 20 && minute >= 55) || hour === 21;
+
+  if (morningIrrigation || eveningIrrigation) {
+    return true;
+  }
+
+  console.log(`Hora atual: ${hour}:${minute}, fora do horário de irrigação`);
+  return false;
 };
 const allowedHours = (hour, minute) => {
   // Janela da manhã: 08:55 até 09:59
