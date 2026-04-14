@@ -117,7 +117,7 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
 
     //ajuste pra considerar os tempo de dessincronização do esp32
     if (allowedHours(Number(hour), Number(minute))) {
-      return await verifyIrrigation(OWPayload, plantingBed, avgSensor);
+      return await verifyIrrigation(OWPayload, plantingBed, avgSensor,Number(hour));
     }
     return 0;
   } catch (err) {
@@ -151,7 +151,7 @@ const predictEvapotranspiration = async (plantingBed, OWPayload) => {
   }
 };
 
-const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
+const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
   try {
     const fc = plantingBed.field_capacity;
     const wp = plantingBed.wilting_point;
@@ -165,7 +165,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor) => {
     const target_water_level = TAW - RAW + wp; //limite inferior da zona de agua disponível pra planta em questão
     const margin = 0.2 * RAW; //margem de segurança de 20% da água facilmente disponível
     let necessary_water = target_water_level + margin - water_level; //agua necessária pra chegar no limite inferior da zona de água disponível pra planta em questão + margem de segurança
-    const nextPeriodHours = now.getHours() === 9 ? 9 : 15;
+    const nextPeriodHours = hours === 9 ? 9 : 15;
 
     const lastIrrigation = await prisma.irrigation.findFirst({
       where: { bed_id: plantingBed.id },
