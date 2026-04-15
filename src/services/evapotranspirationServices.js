@@ -78,14 +78,22 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
           where: { bed_id: plantingBedId },
           orderBy: { date: "desc" },
         });
-        const initialVolume = lastIrrigation.water_before + lastIrrigation.water_added;
+        const initialVolume =
+          lastIrrigation.water_before + lastIrrigation.water_added;
         const lostVolume = initialVolume - water_level;
-        realEtc = Math.max(0,parseFloat((lostVolume / plantingBed.area).toFixed(3)));
+        realEtc = Math.max(
+          0,
+          parseFloat((lostVolume / plantingBed.area).toFixed(3)),
+        );
       } else {
         //se não, calcular normalmente
-        realEtc = parseFloat(
-          ((lastWaterLevel - water_level) / plantingBed.area).toFixed(3),
+        realEtc = Math.max(
+          0,
+          parseFloat(
+            ((lastWaterLevel - water_level) / plantingBed.area).toFixed(3),
+          ),
         );
+        console.log(realEtc);
       }
 
       await prisma.evapotranspiration.update({
@@ -117,7 +125,12 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
 
     //ajuste pra considerar os tempo de dessincronização do esp32
     if (allowedHours(Number(hour), Number(minute))) {
-      return await verifyIrrigation(OWPayload, plantingBed, avgSensor,Number(hour));
+      return await verifyIrrigation(
+        OWPayload,
+        plantingBed,
+        avgSensor,
+        Number(hour),
+      );
     }
     return 0;
   } catch (err) {
@@ -175,11 +188,15 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
       console.log(
         "Atualizando registro de irrigação anterior com dados reais...",
       );
-      const initialVolume = lastIrrigation.water_before + lastIrrigation.water_added;
+      const initialVolume =
+        lastIrrigation.water_before + lastIrrigation.water_added;
       const lostVolume = initialVolume - water_level;
-      const realEtc = Math.max(0, parseFloat((lostVolume / plantingBed.area).toFixed(3)));
+      const realEtc = Math.max(
+        0,
+        parseFloat((lostVolume / plantingBed.area).toFixed(3)),
+      );
       //atualiza o real gasto de etc
-      
+
       const waterAfter = water_level;
 
       await prisma.irrigation.update({
