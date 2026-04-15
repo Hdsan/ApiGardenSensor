@@ -210,7 +210,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
           bed: {
             connect: { id: plantingBed.id },
           },
-          duration: necessary_seconds,
+          duration: necessary_seconds * 1000,
           water_added: parseFloat(necessary_water.toFixed(3)),
           expected_etc: predictedEtc,
           flow_rate: plantingBed.flow_rate,
