@@ -202,7 +202,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
           real_etc: true,
         },
       });
-      console.log(sumLastRealEtc)
+      console.log(sumLastRealEtc);
       realEtc = sumLastRealEtc._sum.real_etc || 0; //mm do periodo
 
       if (realEtc === 0) {
@@ -235,6 +235,13 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
       necessary_seconds = parseFloat(
         (necessary_water / plantingBed.flow_rate).toFixed(2),
       ); // milissegundos necessários pra irrigar a quantidade de água necessária + 1 segundo de offset
+
+      if (necessary_water <= 0) {
+        console.log("Solo saturado, ou com umidade adequada");
+        console.log("Litros acima do necessário: ", necessary_water * -1);
+        necessary_seconds = 0;
+        necessary_water = 0;
+      }
 
       await prisma.irrigation.create({
         data: {
