@@ -6,16 +6,27 @@ const prisma = new PrismaClient();
 
 const storeSensorInfos = async (postBody) => {
   try {
-    const { plantingBedId, sensor1, sensor2, sensor3, sensor4 } = postBody;
+    const {
+      plantingBedId,
+      sensor1,
+      sensor2,
+      sensor3,
+      sensor4,
+      air_temperature,
+      air_humidity,
+    } = postBody;
+
     console.log(new Date());
     console.log("Recebendo: ", postBody);
 
-    // await prisma.air_data.create({
-    //   data: {
-    //     air_temperature: air_temperature,
-    //     air_humidity: air_humidity,
-    //   },
-    // });
+    if (air_temperature != null && air_humidity != null) {
+      await prisma.air_data.create({
+        data: {
+          air_temperature: air_temperature,
+          air_humidity: air_humidity,
+        },
+      });
+    }
 
     if ([sensor1, sensor2, sensor3, sensor4].every((v) => v == null)) {
       throw new Error("Nenhum dado de sensor de umidade fornecido.");
@@ -39,8 +50,8 @@ const storeSensorInfos = async (postBody) => {
 
         let percent = ((dry - raw) / (dry - wet)) * 100;
 
-        // limitar 0–150% - 50 de saturação
-        percent = Math.max(0, Math.min(150, percent));
+        // limitar 0–100% 
+        percent = Math.max(0, Math.min(100, percent));
         percent = Math.round(percent * 100) / 100; // arredondar para 2 casas decimais
 
         return {
