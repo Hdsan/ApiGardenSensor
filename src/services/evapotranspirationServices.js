@@ -82,16 +82,14 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
           lastIrrigation.water_before + lastIrrigation.water_added;
 
         const lostVolume = initialVolume - water_level;
-        realEtc = parseFloat((lostVolume / plantingBed.area).toFixed(3))
-        
+        realEtc = parseFloat((lostVolume / plantingBed.area).toFixed(3));
       } else {
         //se não, calcular normalmente
-       
-          parseFloat(
-            ((lastWaterLevel - water_level) / plantingBed.area).toFixed(3),
-          ),
-     
-        console.log(realEtc);
+
+        (parseFloat(
+          ((lastWaterLevel - water_level) / plantingBed.area).toFixed(3),
+        ),
+          console.log(realEtc));
       }
 
       await prisma.evapotranspiration.update({
@@ -183,6 +181,10 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
       where: { bed_id: plantingBed.id },
       orderBy: { date: "desc" },
     });
+    const predictedEtc = await predictEvapotranspiration(
+      plantingBed,
+      OWPayload.hourly.slice(0, nextPeriodHours), // predição de x horas
+    ); // mm
     if (lastIrrigation != null) {
       let realEtc = 0;
       console.log(
@@ -206,10 +208,8 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
         const initialVolume =
           lastIrrigation.water_before + lastIrrigation.water_added; //lt
         const lostVolume = initialVolume - water_level;
-        realEtc = 
-          
-          parseFloat((lostVolume / plantingBed.area).toFixed(3))
-        
+        realEtc = parseFloat((lostVolume / plantingBed.area).toFixed(3));
+
         //atualiza o real gasto de etc
       }
       await prisma.irrigation.update({
@@ -220,14 +220,43 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
         },
       });
     }
-    // const pastPeriodHours = now.getHours() - (addHour === 9 ? 15 : 9);
+    //logica de pausa de acordo com a cultura
+    if (plantingBed.stage.pause_periods > 0) {
+      const last_irrigations = await prisma.irrigation.aggregate({
+        where: { bed_id: plantingBed.id },
+        orderBy: { date: "desc" },
+        take: plantingBed.stage.pause_periods,
+        _sum: {
+          water_added: true,
+        },
+      });
+      if (last_irrigations._sum.water_added > 0) {
+        console.log("Cultura em período de pausa, irrigação não necessária.");
+        await prisma.irrigation.create({
+          data: {
+            id: uuidv4(),
+            date: new Date(),
+            bed: {
+              connect: { id: plantingBed.id },
+            },
+            duration: 0,
+            water_added: 0,
+            expected_etc: predictedEtc,
+            flow_rate: plantingBed.flow_rate,
+            real_etc: null,
+            water_before: water_level,
+            water_after: null,
+          },
+        });
+        return 0;
+      }
+      console.log(
+        "Cultura voltando de período de pausa, irrigação será calculada normalmente.",
+      );
+    }
     let necessary_seconds = 0;
 
     if (water_level < plantingBed.field_capacity) {
-      const predictedEtc = await predictEvapotranspiration(
-        plantingBed,
-        OWPayload.hourly.slice(0, nextPeriodHours), // predição de x horas
-      ); // mm
       necessary_water = necessary_water + predictedEtc * plantingBed.area; // agua necessária pra irrigar + previsão de evapotranspiração  //em Litros
       necessary_seconds = parseFloat(
         (necessary_water / plantingBed.flow_rate).toFixed(2),

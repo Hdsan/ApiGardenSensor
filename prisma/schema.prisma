@@ -64,6 +64,7 @@ model crop_stages {
   crop_id  String
   planting_beds planting_bed[]
   crop     crops  @relation(fields: [crop_id], references: [id])
+  pause_periods Int?   @default(0)
 }
 
 model crops {
