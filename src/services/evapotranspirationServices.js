@@ -35,7 +35,7 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
     const water_level = parseFloat((water_percent * fc).toFixed(2)); //agua mm no solo
 
     const OWPayload = await openWeatherData();
-
+    
     //corrige a antiga
     const lastEtcPrediction = await prisma.evapotranspiration.findFirst({
       where: { bed_id: plantingBedId },
@@ -86,10 +86,10 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
       } else {
         //se não, calcular normalmente
 
-        (parseFloat(
-          ((lastWaterLevel - water_level) / plantingBed.area).toFixed(3),
-        ),
-          console.log(realEtc));
+        realEtc = parseFloat(
+          ((lastWaterLevel - water_level) / plantingBed.area).toFixed(3));
+        
+          console.log(realEtc);
       }
 
       await prisma.evapotranspiration.update({
