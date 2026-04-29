@@ -82,18 +82,15 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
           lastIrrigation.water_before + lastIrrigation.water_added;
 
         const lostVolume = initialVolume - water_level;
-        realEtc = Math.max(
-          0,
-          parseFloat((lostVolume / plantingBed.area).toFixed(3)),
-        );
+        realEtc = parseFloat((lostVolume / plantingBed.area).toFixed(3))
+        
       } else {
         //se não, calcular normalmente
-        realEtc = Math.max(
-          0,
+       
           parseFloat(
             ((lastWaterLevel - water_level) / plantingBed.area).toFixed(3),
           ),
-        );
+     
         console.log(realEtc);
       }
 
@@ -209,10 +206,10 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
         const initialVolume =
           lastIrrigation.water_before + lastIrrigation.water_added; //lt
         const lostVolume = initialVolume - water_level;
-        realEtc = Math.max(
-          0,
-          parseFloat((lostVolume / plantingBed.area).toFixed(3)),
-        );
+        realEtc = 
+          
+          parseFloat((lostVolume / plantingBed.area).toFixed(3))
+        
         //atualiza o real gasto de etc
       }
       await prisma.irrigation.update({
