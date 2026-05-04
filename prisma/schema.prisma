@@ -99,6 +99,7 @@ model irrigation {
   flow_rate    Float        @default(0)
   stage crop_stages? @relation(fields: [stage_id], references: [id])
   stage_id String?
+  pause    Boolean @default(false)
 }
 
 model evapotranspiration {
