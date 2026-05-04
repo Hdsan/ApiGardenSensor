@@ -172,7 +172,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
 
     const water_level = parseFloat((water_percent * fc).toFixed(3)); //agua ml no solo
     const target_water_level = TAW - RAW + wp; //limite inferior da zona de agua disponível pra planta em questão
-    const margin = 0.2 * RAW; //margem de segurança de 20% da água facilmente disponível
+    const margin = 0.1 * RAW; //margem de segurança de 10% da água facilmente disponível
     let necessary_water = target_water_level + margin - water_level; //agua necessária pra chegar no limite inferior da zona de água disponível pra planta em questão + margem de segurança
     const nextPeriodHours = hours === 9 ? 9 : 15;
     const lastPeriodHours = hours === 9 ? 15 : 9;
