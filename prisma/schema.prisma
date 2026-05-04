@@ -65,6 +65,8 @@ model crop_stages {
   planting_beds planting_bed[]
   crop     crops  @relation(fields: [crop_id], references: [id])
   pause_periods Int?   @default(0)
+  irrigations irrigation[]
+  
 }
 
 model crops {
@@ -94,6 +96,8 @@ model irrigation {
   expected_etc Float        @default(0)
   real_etc     Float?
   flow_rate    Float        @default(0)
+  stage crop_stages? @relation(fields: [stage_id], references: [id])
+  stage_id String?
 }
 
 model evapotranspiration {

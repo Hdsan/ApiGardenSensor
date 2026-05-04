@@ -246,6 +246,9 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
             real_etc: null,
             water_before: water_level,
             water_after: null,
+            stage: {
+              connect: { id: plantingBed.stage.id },
+            },
           },
         });
         return 0;
@@ -283,6 +286,9 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
           real_etc: null,
           water_before: water_level,
           water_after: null,
+          stage: {
+            connect: { id: plantingBed.stage.id },
+          },
         },
       });
       console.log(
