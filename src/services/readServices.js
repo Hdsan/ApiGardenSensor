@@ -38,40 +38,54 @@ const storeSensorInfos = async (postBody) => {
     });
 
     const values = [sensor1, sensor2, sensor3, sensor4];
+    const avg =
+      values.reduce((sum, val) => sum + (val || 0), 0) /
+      values.filter(Boolean).length;
 
     const readsToCreate = sensors
       .map((sensor, i) => {
         const raw = values[i];
-
         if (raw == null) return null;
 
         const dry = sensor.dry_reference_adc;
         const wet = sensor.wet_reference_adc;
 
         let percent = ((dry - raw) / (dry - wet)) * 100;
-
-        // limitar 0–100% 
         percent = Math.max(0, Math.min(100, percent));
-        percent = Math.round(percent * 100) / 100; // arredondar para 2 casas decimais
 
         return {
           sensor_id: sensor.id,
           bed_id: plantingBedId,
           raw_value: raw,
-          value: percent,
+          value: Math.round(percent * 100) / 100,
           date: moment().tz("America/Sao_Paulo").format(),
         };
       })
       .filter(Boolean);
 
+    const avgPercent =
+      readsToCreate.reduce((sum, r) => sum + r.value, 0) / readsToCreate.length;
+
+    const filteredReads = readsToCreate.map((read, i) => {
+      const isValid = Math.abs(read.value - avgPercent) <= 20;
+      if (!isValid) {
+        console.log(`⚠️⚠️⚠️⚠️  Sensor ${sensors[i].order} - is_valid: false`, { value: read.value, avg: avgPercent });
+      }
+      return {
+        ...read,
+        is_valid: isValid,
+      };
+    });
+
+
     await prisma.reads.createMany({
-      data: readsToCreate,
+      data: filteredReads,
     });
 
     const irrigation_miliseconds =
       await evapotranspirationServices.verifyEvapotranspiration(
         plantingBedId,
-        readsToCreate,
+        filteredReads,
       );
 
     return irrigation_miliseconds;

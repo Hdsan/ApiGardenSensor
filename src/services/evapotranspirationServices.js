@@ -17,8 +17,9 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
       hour12: false,
     }).format(now);
 
+    const validReads = reads.filter((read) => read.is_valid === true);
     const avgSensor =
-      reads.reduce((sum, read) => sum + read.value, 0) / reads.length;
+      validReads.reduce((sum, read) => sum + read.value, 0) / validReads.length;
     const plantingBed = await prisma.planting_bed.findUnique({
       where: { id: plantingBedId },
       include: { stage: true, plant: true },
@@ -35,7 +36,7 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
     const water_level = parseFloat((water_percent * fc).toFixed(2)); //agua mm no solo
 
     const OWPayload = await openWeatherData();
-    
+
     //corrige a antiga
     const lastEtcPrediction = await prisma.evapotranspiration.findFirst({
       where: { bed_id: plantingBedId },
@@ -87,9 +88,10 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
         //se não, calcular normalmente
 
         realEtc = parseFloat(
-          ((lastWaterLevel - water_level) / plantingBed.area).toFixed(3));
-        
-          console.log(realEtc);
+          ((lastWaterLevel - water_level) / plantingBed.area).toFixed(3),
+        );
+
+        console.log(realEtc);
       }
 
       await prisma.evapotranspiration.update({
@@ -120,14 +122,14 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
     console.log("Previsão de evapotranspiração (mm): ", newEtcRecord);
 
     //ajuste pra considerar os tempo de dessincronização do esp32
-    // if (allowedHours(Number(hour), Number(minute))) {
-      return await verifyIrrigation(
-        OWPayload,
-        plantingBed,
-        avgSensor,
-        Number(hour),
-      );
-    // }
+    if (allowedHours(Number(hour), Number(minute))) {
+    return await verifyIrrigation(
+      OWPayload,
+      plantingBed,
+      avgSensor,
+      Number(hour),
+    );
+    }
     return 0;
   } catch (err) {
     console.log("Erro ao calcular ETc: ", err);
@@ -171,7 +173,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
     const RAW = TAW * p;
 
     const water_level = parseFloat((water_percent * fc).toFixed(3)); //agua ml no solo
-    
+
     const raw_inferior_level = fc - RAW;
     const margin = 0.1 * RAW; //margem de segurança de 10% da água facilmente disponível
     let target_water_level = raw_inferior_level + margin; //agua necessária pra chegar no limite inferior da zona de água disponível pra planta em questão + margem de segurança
@@ -252,7 +254,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
             stage: {
               connect: { id: plantingBed.stage.id },
             },
-            pause: true
+            pause: true,
           },
         });
         return 0;
@@ -294,7 +296,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
           stage: {
             connect: { id: plantingBed.stage.id },
           },
-          pause: false
+          pause: false,
         },
       });
       console.log(
