@@ -62,26 +62,34 @@ const storeSensorInfos = async (postBody) => {
         };
       })
       .filter(Boolean);
+    const sortedReads = [...readsToCreate].sort(
+      (a, b) => a.raw_value - b.raw_value, // Ordena pelo RAW
+    );
 
-    const avgPercent =
-      readsToCreate.reduce((sum, r) => sum + r.value, 0) / readsToCreate.length;
+    const anchorAvg = (sortedReads[1].raw_value + sortedReads[2].raw_value) / 2;
+    const avgMargin = anchorAvg * 0.2;
 
     const filteredReads = readsToCreate.map((read, i) => {
-      const isValid = Math.abs(read.value - avgPercent) <= 20;
+      const deviation = Math.abs(read.raw_value - anchorAvg);
+      const isValid = deviation <= avgMargin;
+
       if (!isValid) {
-        console.log(`⚠️⚠️⚠️⚠️  Sensor ${sensors[i].order} - is_valid: false`, { value: read.value, avg: avgPercent });
+        console.log(`⚠️ Sensor ${sensors[i].order} Inválido (Outlier)`, {
+          percent: read.value,
+          raw: read.raw_value,
+          anchorRaw: anchorAvg.toFixed(2),
+          margin: avgMargin.toFixed(2),
+        });
       }
+
       return {
         ...read,
         is_valid: isValid,
       };
     });
-
-
     await prisma.reads.createMany({
       data: filteredReads,
     });
-
     const irrigation_miliseconds =
       await evapotranspirationServices.verifyEvapotranspiration(
         plantingBedId,

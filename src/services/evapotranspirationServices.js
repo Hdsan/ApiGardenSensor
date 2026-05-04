@@ -45,6 +45,7 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
     if (lastEtcPrediction != null) {
       let lastSensorReads;
       lastSensorReads = await prisma.reads.findMany({
+        //não filtra por is_valid, por causa do 'take' e 'skip', poderia pegar registro de outro periodo
         where: {
           bed_id: plantingBedId,
         },
@@ -62,10 +63,14 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
         });
       }
 
+      const filteredLastSensorReads = lastSensorReads.filter(
+        (read) => read.is_valid === true,
+      );
+
       const avgLastSensorValue =
-        lastSensorReads.length > 0
-          ? lastSensorReads.reduce((sum, read) => sum + read.value, 0) /
-            lastSensorReads.length
+        filteredLastSensorReads.length > 0
+          ? filteredLastSensorReads.reduce((sum, read) => sum + read.value, 0) /
+            filteredLastSensorReads.length
           : 0;
 
       const lastWaterLevel = parseFloat(
@@ -123,12 +128,12 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
 
     //ajuste pra considerar os tempo de dessincronização do esp32
     if (allowedHours(Number(hour), Number(minute))) {
-    return await verifyIrrigation(
-      OWPayload,
-      plantingBed,
-      avgSensor,
-      Number(hour),
-    );
+      return await verifyIrrigation(
+        OWPayload,
+        plantingBed,
+        avgSensor,
+        Number(hour),
+      );
     }
     return 0;
   } catch (err) {
