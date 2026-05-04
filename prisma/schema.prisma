@@ -90,6 +90,7 @@ model irrigation {
   bed_id       String
   water_before  Float
   water_after   Float?
+  target_water_level Float?
   water_added  Float
   duration     Int
   bed          planting_bed @relation(fields: [bed_id], references: [id])

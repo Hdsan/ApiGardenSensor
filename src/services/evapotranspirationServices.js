@@ -171,9 +171,11 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
     const RAW = TAW * p;
 
     const water_level = parseFloat((water_percent * fc).toFixed(3)); //agua ml no solo
-    const target_water_level = TAW - RAW + wp; //limite inferior da zona de agua disponível pra planta em questão
+    
+    const raw_inferior_level = fc - RAW;
     const margin = 0.1 * RAW; //margem de segurança de 10% da água facilmente disponível
-    let necessary_water = target_water_level + margin - water_level; //agua necessária pra chegar no limite inferior da zona de água disponível pra planta em questão + margem de segurança
+    let target_water_level = raw_inferior_level + margin; //agua necessária pra chegar no limite inferior da zona de água disponível pra planta em questão + margem de segurança
+    let necessary_water = target_water_level - water_level;
     const nextPeriodHours = hours === 9 ? 9 : 15;
     const lastPeriodHours = hours === 9 ? 15 : 9;
 
@@ -242,6 +244,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
             duration: 0,
             water_added: 0,
             expected_etc: predictedEtc,
+            target_water_level: parseFloat(target_water_level.toFixed(3)),
             flow_rate: plantingBed.flow_rate,
             real_etc: null,
             water_before: water_level,
@@ -284,6 +287,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
           expected_etc: predictedEtc,
           flow_rate: plantingBed.flow_rate,
           real_etc: null,
+          target_water_level: parseFloat(target_water_level.toFixed(3)),
           water_before: water_level,
           water_after: null,
           stage: {
