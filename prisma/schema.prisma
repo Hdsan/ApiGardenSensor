@@ -15,19 +15,19 @@ datasource db {
 }
 
 model planting_bed {
-  stage_id       String?    
-  stage          crop_stages?  @relation(fields: [stage_id], references: [id])
-  id             String       @id @default(uuid())
-  sensors        sensor[]
-  field_capacity Float        @default(0)
-  wilting_point  Float        @default(0)
-  volume         Float        @default(0)
-  area           Float        @default(0)
-  plant_id       String?
-  plant          crops?       @relation(fields: [plant_id], references: [id])
-  reads          reads[]
-  irrigations    irrigation[]
-  flow_rate      Float        @default(0)
+  stage_id           String?
+  stage              crop_stages?         @relation(fields: [stage_id], references: [id])
+  id                 String               @id @default(uuid())
+  sensors            sensor[]
+  field_capacity     Float                @default(0)
+  wilting_point      Float                @default(0)
+  volume             Float                @default(0)
+  area               Float                @default(0)
+  plant_id           String?
+  plant              crops?               @relation(fields: [plant_id], references: [id])
+  reads              reads[]
+  irrigations        irrigation[]
+  flow_rate          Float                @default(0)
   evapotranspiration evapotranspiration[]
 }
 
@@ -40,6 +40,7 @@ model sensor {
   reads             reads[]
   dry_reference_adc Int          @default(4095)
   wet_reference_adc Int          @default(0)
+  enabled           Boolean      @default(true)
 }
 
 model reads {
@@ -53,28 +54,28 @@ model reads {
   sensor    sensor       @relation(fields: [sensor_id], references: [id])
   rainfall  Boolean      @default(false)
   is_valid  Boolean      @default(true)
+
   @@index([bed_id, date])
 }
 
 model crop_stages {
-  id       String @id @default(uuid())
-  name     String
-  duration Int
-  kc       Float
-  crop_id  String
+  id            String         @id @default(uuid())
+  name          String
+  duration      Int
+  kc            Float
+  crop_id       String
   planting_beds planting_bed[]
-  crop     crops  @relation(fields: [crop_id], references: [id])
-  pause_periods Int?   @default(0)
-  irrigations irrigation[]
-  
+  crop          crops          @relation(fields: [crop_id], references: [id])
+  pause_periods Int?           @default(0)
+  irrigations   irrigation[]
 }
 
 model crops {
-  id                 String        @id @default(uuid())
+  id                 String         @id @default(uuid())
   name               String
   stages             crop_stages[]
-  depletion_fraction Float         @default(0)
-  plantingBeds planting_bed[]
+  depletion_fraction Float          @default(0)
+  plantingBeds       planting_bed[]
 }
 
 model air_data {
@@ -85,31 +86,31 @@ model air_data {
 }
 
 model irrigation {
-  id           String       @id @default(uuid())
-  date         DateTime     @default(now())
-  bed_id       String
-  water_before  Float
-  water_after   Float?
+  id                 String       @id @default(uuid())
+  date               DateTime     @default(now())
+  bed_id             String
+  water_before       Float
+  water_after        Float?
   target_water_level Float?
-  water_added  Float
-  duration     Int
-  bed          planting_bed @relation(fields: [bed_id], references: [id])
-  expected_etc Float        @default(0)
-  real_etc     Float?
-  flow_rate    Float        @default(0)
-  stage crop_stages? @relation(fields: [stage_id], references: [id])
-  stage_id String?
-  pause    Boolean @default(false)
+  water_added        Float
+  duration           Int
+  bed                planting_bed @relation(fields: [bed_id], references: [id])
+  expected_etc       Float        @default(0)
+  real_etc           Float?
+  flow_rate          Float        @default(0)
+  stage              crop_stages? @relation(fields: [stage_id], references: [id])
+  stage_id           String?
+  pause              Boolean      @default(false)
 }
 
 model evapotranspiration {
-  id           String   @id @default(uuid())
+  id           String       @id @default(uuid())
   date         DateTime
   bed_id       String
-  expected_etc Float  
-  real_etc     Float?   
-  is_valid     Boolean  @default(true)
-  bed planting_bed @relation(fields: [bed_id], references: [id])
-  @@index([bed_id, date])
+  expected_etc Float
+  real_etc     Float?
+  is_valid     Boolean      @default(true)
+  bed          planting_bed @relation(fields: [bed_id], references: [id])
 
+  @@index([bed_id, date])
 }

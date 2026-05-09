@@ -17,7 +17,17 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
       hour12: false,
     }).format(now);
 
+    await Promise.all(
+      reads.map(async (read) => {
+        const sensor = await prisma.sensor.findUnique({
+          where: { id: read.sensor_id },
+        });
+        read.is_valid = sensor ? sensor.enabled : false;
+      }),
+    );
+    //filtro dos registros validos atuais
     const validReads = reads.filter((read) => read.is_valid === true);
+
     const avgSensor =
       validReads.reduce((sum, read) => sum + read.value, 0) / validReads.length;
     const plantingBed = await prisma.planting_bed.findUnique({
@@ -62,7 +72,7 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
           take: 4, //não descarta, porque tem somente 4 registros
         });
       }
-
+      //filtra os registros antigos válidos
       const filteredLastSensorReads = lastSensorReads.filter(
         (read) => read.is_valid === true,
       );
