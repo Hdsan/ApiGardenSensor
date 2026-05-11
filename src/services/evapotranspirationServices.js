@@ -137,14 +137,14 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
     console.log("Previsão de evapotranspiração (mm): ", newEtcRecord);
 
     //ajuste pra considerar os tempo de dessincronização do esp32
-    if (allowedHours(Number(hour), Number(minute))) {
-      return await verifyIrrigation(
-        OWPayload,
-        plantingBed,
-        avgSensor,
-        Number(hour),
-      );
-    }
+    // if (allowedHours(Number(hour), Number(minute))) {
+    return await verifyIrrigation(
+      OWPayload,
+      plantingBed,
+      avgSensor,
+      Number(hour),
+    );
+    // }
     return 0;
   } catch (err) {
     console.log("Erro ao calcular ETc: ", err);
@@ -205,6 +205,51 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
       OWPayload.hourly.slice(0, nextPeriodHours), // predição de x horas
     ); // mm
     if (lastIrrigation != null) {
+      //--> envia /learn pra IA
+
+      const irrigationDate = new Date(lastIrrigation.date);
+
+      const startOfHour = new Date(irrigationDate);
+      startOfHour.setMinutes(0, 0, 0);
+
+      const endOfHour = new Date(irrigationDate);
+      endOfHour.setMinutes(59, 59, 999);
+
+      const lastIrrigationAirData = await prisma.air_data.findFirst({
+        where: {
+          date: {
+            gte: startOfHour,
+            lte: endOfHour,
+          },
+        },
+        orderBy: {
+          date: "desc",
+        },
+        take: 1
+      });
+
+      const body = {
+        moisture_before: lastIrrigation.water_before,
+        hour_before: lastPeriodHours,
+        temp: lastIrrigationAirData.air_temperature,
+        air_humidity: lastIrrigationAirData.air_humidity,
+        action_idx: lastIrrigation.action_idx,
+        volume_applied: lastIrrigation.water_added,
+        moisture_after: water_level,
+        hour_after: nextPeriodHours,
+        target_raw: lastIrrigation.target_water_level,
+      };
+
+      const url = process.env.IA_URL + "/learn";
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+      console.log("IA: ", response);
+
       let realEtc = 0;
       console.log(
         "Atualizando registro de irrigação anterior com dados reais...",
@@ -270,6 +315,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
               connect: { id: plantingBed.stage.id },
             },
             pause: true,
+            action_idx: 3,
           },
         });
         return 0;
@@ -279,18 +325,60 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
       );
     }
     let necessary_seconds = 0;
+    let action_idx = 3; // 3 = sem interferencia da IA
+    let finalVolume = necessary_water;
 
     if (water_level < plantingBed.field_capacity) {
       necessary_water = necessary_water + predictedEtc * plantingBed.area; // agua necessária pra irrigar + previsão de evapotranspiração  //em Litros
-      necessary_seconds = parseFloat(
-        (necessary_water / plantingBed.flow_rate).toFixed(2),
-      ); // milissegundos necessários pra irrigar a quantidade de água necessária + 1 segundo de offset
-
+      //solo com agua acima do necessário
       if (necessary_water <= 0) {
         console.log("Solo saturado, ou com umidade adequada");
         console.log("Litros acima do necessário: ", necessary_water * -1);
         necessary_seconds = 0;
         necessary_water = 0;
+      } else {
+        //solo com agua abaixo do necessário, acionar a IA
+        try {
+          //post pra /decide
+          const airData = await prisma.air_data.findFirst({
+            orderBy: { date: "desc" },
+          });
+          const body = {
+            moisture: water_level,
+            hour: nextPeriodHours,
+            temp: airData.air_temperature,
+            air_humidity: airData.air_humidity,
+            volume_ab: necessary_water,
+          };
+          const url = process.env.IA_URL + "/decide";
+          const IAresponse = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body),
+          });
+          const IaData = await IAresponse.json();
+          action_idx = IaData.action_idx;
+          finalVolume = IaData.volume_final;
+
+          console.log(
+            "Decisão da IA:",
+            IaData.action_idx,
+            "Volume final recomendado pela IA (L): ",
+            finalVolume,
+          );
+        } catch (err) {
+          console.error(
+            "Erro ao comunicar com a IA, usando decisão padrão. ",
+            err,
+          );
+          action_idx = 3;
+          finalVolume = necessary_water;
+        }
+        necessary_seconds = parseFloat(
+          (finalVolume / plantingBed.flow_rate).toFixed(2),
+        ); // milissegundos necessários pra irrigar a quantidade de água necessária + 1 segundo de offset
       }
 
       await prisma.irrigation.create({
@@ -301,7 +389,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
             connect: { id: plantingBed.id },
           },
           duration: necessary_seconds * 1000,
-          water_added: parseFloat(necessary_water.toFixed(3)),
+          water_added: parseFloat(finalVolume.toFixed(3)),
           expected_etc: predictedEtc,
           flow_rate: plantingBed.flow_rate,
           real_etc: null,
@@ -312,6 +400,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
             connect: { id: plantingBed.stage.id },
           },
           pause: false,
+          action_idx, //ação decidida pela IA
         },
       });
       console.log(

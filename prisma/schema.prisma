@@ -101,6 +101,7 @@ model irrigation {
   stage              crop_stages? @relation(fields: [stage_id], references: [id])
   stage_id           String?
   pause              Boolean      @default(false)
+  action_idx         Int          @default(3)
 }
 
 model evapotranspiration {
