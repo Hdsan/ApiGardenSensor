@@ -236,7 +236,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
         action_idx: lastIrrigation.action_idx,
         volume_applied: lastIrrigation.water_added,
         moisture_after: water_level,
-        hour_after: nextPeriodHours,
+        hour_after: nextPeriodHours === 9 ? 9 : 18,
         target_raw: lastIrrigation.target_water_level,
       };
 
@@ -345,7 +345,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
           });
           const body = {
             moisture: water_level,
-            hour: nextPeriodHours,
+            hour: nextPeriodHours === 9 ? 9 : 18,
             temp: airData.air_temperature,
             air_humidity: airData.air_humidity,
             volume_ab: necessary_water,
