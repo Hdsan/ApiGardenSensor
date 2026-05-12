@@ -230,7 +230,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
 
       const body = {
         moisture_before: lastIrrigation.water_before,
-        hour_before: lastPeriodHours,
+        hour_before: lastPeriodHours === 9 ? 9 : 18,
         temp: lastIrrigationAirData.air_temperature,
         air_humidity: lastIrrigationAirData.air_humidity,
         action_idx: lastIrrigation.action_idx,
