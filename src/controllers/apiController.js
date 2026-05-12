@@ -22,4 +22,10 @@ router.get("/", async (req, res) => {
   res.json(response);
 });
 
+router.post("/teach", async (req, res) => {
+const { bedId } = req.body;
+const response = await readServices.teachIrrigationToIA(bedId);
+res.json(response);
+});
+
 export default router;

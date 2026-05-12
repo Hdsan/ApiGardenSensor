@@ -102,6 +102,7 @@ model irrigation {
   stage_id           String?
   pause              Boolean      @default(false)
   action_idx         Int          @default(3)
+  learn              Boolean      @default(false)
 }
 
 model evapotranspiration {

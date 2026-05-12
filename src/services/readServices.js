@@ -165,7 +165,94 @@ async function getReadInfos(bedId) {
   });
   return sensors;
 }
+
+async function teachIrrigationToIA(plantingBedId) {
+  try {
+    const irrigations = await prisma.irrigation.findMany({
+      where: {
+        bed_id: plantingBedId,
+        learn: true,
+        real_etc: { not: null },
+      },
+    });
+
+    if (irrigations.length === 0) {
+      console.log("Nenhuma irrigação para ensinar à IA.");
+      return false;
+    }
+    await Promise.all(
+      irrigations.map(async (irrigation) => {
+        let hour_before = moment(irrigation.date)
+          .tz("America/Sao_Paulo")
+          .hour();
+
+        if (hour_before === 8 || hour_before === 17) {
+          hour_before += 1;
+        }
+        const irrigationDate = new Date(irrigation.date);
+
+        const startOfHour = new Date(irrigationDate);
+        startOfHour.setMinutes(0, 0, 0);
+
+        const endOfHour = new Date(irrigationDate);
+        endOfHour.setMinutes(59, 59, 999);
+
+        const irrigationAirData = await prisma.air_data.findFirst({
+          where: {
+            date: {
+              gte: startOfHour,
+              lte: endOfHour,
+            },
+          },
+          orderBy: {
+            date: "desc",
+          },
+          take: 1,
+        });
+        const body = {
+          moisture_before: irrigation.water_before,
+          hour_before: hour_before,
+          temp: irrigationAirData.air_temperature,
+          air_humidity: irrigationAirData.air_humidity,
+          action_idx: irrigation.action_idx,
+          volume_applied: irrigation.water_added,
+          moisture_after: irrigation.water_after,
+          hour_after: hour_before === 9 ? 18 : 9,
+          target_raw: irrigation.target_water_level,
+        };
+
+        const url = process.env.IA_URL + "/learn";
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
+      }),
+    ).then(async () => {
+      await prisma.irrigation.updateMany({
+        where: {
+          bed_id: plantingBedId,
+          learn: true,
+          real_etc: { not: null },
+        },
+        data: {
+          // learn: false,
+        },
+      });
+    });
+    return {
+      status: true,
+      message: irrigations.length + " registros ensinados.",
+    };
+  } catch (error) {
+    console.error("Erro ao ensinar irrigação à IA:", error);
+    return { status: false, message: "Erro ao ensinar irrigação à IA." };
+  }
+}
 export default {
   storeSensorInfos,
   getReadInfos,
+  teachIrrigationToIA,
 };
