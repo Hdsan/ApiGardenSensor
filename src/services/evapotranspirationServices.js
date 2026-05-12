@@ -137,14 +137,14 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
     console.log("Previsão de evapotranspiração (mm): ", newEtcRecord);
 
     //ajuste pra considerar os tempo de dessincronização do esp32
-    // if (allowedHours(Number(hour), Number(minute))) {
+    if (allowedHours(Number(hour), Number(minute))) {
     return await verifyIrrigation(
       OWPayload,
       plantingBed,
       avgSensor,
       Number(hour),
     );
-    // }
+    }
     return 0;
   } catch (err) {
     console.log("Erro ao calcular ETc: ", err);
