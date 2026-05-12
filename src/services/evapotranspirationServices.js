@@ -325,7 +325,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
       );
     }
     let necessary_seconds = 0;
-    let action_idx = 3; // 3 = sem interferencia da IA
+    let action = 3; // 3 = sem interferencia da IA
     let finalVolume = necessary_water;
 
     if (water_level < plantingBed.field_capacity) {
@@ -359,7 +359,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
             body: JSON.stringify(body),
           });
           const IaData = await IAresponse.json();
-          action_idx = IaData.action_idx;
+          action = IaData.action_idx;
           finalVolume = IaData.volume_final;
 
           console.log(
@@ -373,7 +373,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
             "Erro ao comunicar com a IA, usando decisão padrão. ",
             err,
           );
-          action_idx = 3;
+          action = 3;
           finalVolume = necessary_water;
         }
         necessary_seconds = parseFloat(
@@ -400,7 +400,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
             connect: { id: plantingBed.stage.id },
           },
           pause: false,
-          action_idx, //ação decidida pela IA
+          action_idx: action, //ação decidida pela IA
         },
       });
       console.log(
