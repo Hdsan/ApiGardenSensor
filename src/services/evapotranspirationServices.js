@@ -336,6 +336,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
         console.log("Litros acima do necessário: ", necessary_water * -1);
         necessary_seconds = 0;
         necessary_water = 0;
+        finalVolume = 0;
       } else {
         //solo com agua abaixo do necessário, acionar a IA
         try {
