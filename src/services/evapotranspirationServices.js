@@ -327,6 +327,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
     let necessary_seconds = 0;
     let action = 2; // 2 = sem interferencia da IA
     let finalVolume = necessary_water;
+    const pump_offset = 2; //segundos de offset para compensar o tempo de resposta da bomba
 
     if (water_level < plantingBed.field_capacity) {
       necessary_water = necessary_water + predictedEtc * plantingBed.area; // agua necessária pra irrigar + previsão de evapotranspiração  //em Litros
@@ -379,7 +380,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
         }
         necessary_seconds = parseFloat(
           (finalVolume / plantingBed.flow_rate).toFixed(2),
-        ); // milissegundos necessários pra irrigar a quantidade de água necessária + 1 segundo de offset
+        ) + pump_offset; // milissegundos necessários pra irrigar a quantidade de água necessária + segundo de offset
       }
 
       await prisma.irrigation.create({
