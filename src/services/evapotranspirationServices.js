@@ -155,7 +155,7 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
 const predictEvapotranspiration = async (plantingBed, OWPayload) => {
   try {
     const PeriodETo = OWPayload.reduce((sum, hour) => {
-      const rs = uviToRs(hour.uvi, hour.clouds);
+      const rs = uviToRs(hour.uvi, 0);// as nuvens já são consideradas na API da Openweather
       return (
         sum +
         penmanMonteithHour({
@@ -251,31 +251,31 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
       console.log("IA: ", response);
 
       let realEtc = 0;
-      console.log(
-        "Atualizando registro de irrigação anterior com dados reais...",
-      );
-      const sumLastRealEtc = await prisma.evapotranspiration.aggregate({
-        where: {
-          bed_id: plantingBed.id,
-          date: {
-            gte: new Date(Date.now() - lastPeriodHours * 60 * 60 * 1000),
-          },
-        },
-        _sum: {
-          real_etc: true,
-        },
-      });
-      console.log(sumLastRealEtc);
-      realEtc = sumLastRealEtc._sum.real_etc || 0; //mm do periodo
+      // console.log(
+      //   "Atualizando registro de irrigação anterior com dados reais...",
+      // );
+      // const sumLastRealEtc = await prisma.evapotranspiration.aggregate({
+      //   where: {
+      //     bed_id: plantingBed.id,
+      //     date: {
+      //       gte: new Date(Date.now() - lastPeriodHours * 60 * 60 * 1000),
+      //     },
+      //   },
+      //   _sum: {
+      //     real_etc: true,
+      //   },
+      // });
+      // console.log(sumLastRealEtc);
+      // realEtc = sumLastRealEtc._sum.real_etc || 0; //mm do periodo
 
-      if (realEtc === 0) {
+      // if (realEtc === 0) {
         const initialVolume =
           lastIrrigation.water_before + lastIrrigation.water_added; //lt
         const lostVolume = initialVolume - water_level;
         realEtc = parseFloat((lostVolume / plantingBed.area).toFixed(3));
 
         //atualiza o real gasto de etc
-      }
+      // }
       await prisma.irrigation.update({
         where: { id: lastIrrigation.id },
         data: {
@@ -451,7 +451,7 @@ const allowedHours = (hour, minute) => {
 const openWeatherData = async () => {
   try {
     const response = await fetch(
-      `https://api.openweathermap.org/data/3.0/onecall?lat=${process.env.LATITUDE}&lon=${process.env.LONGITUDE}&exclude=current,minutely,alerts, daily&appid=${process.env.OPENWEATHER_API_KEY}&units=metric`,
+      `https://api.openweathermap.org/data/3.0/onecall?lat=${process.env.LATITUDE}&lon=${process.env.LONGITUDE}&exclude=current,minutely,alerts,daily&appid=${process.env.OPENWEATHER_API_KEY}&units=metric`,
     );
     const data = await response.json();
     return data;
