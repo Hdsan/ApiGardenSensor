@@ -238,7 +238,7 @@ async function teachIrrigationToIA(plantingBedId) {
           real_etc: { not: null },
         },
         data: {
-          // learn: false,
+          learn: false,
         },
       });
     });
