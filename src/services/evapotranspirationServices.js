@@ -241,16 +241,21 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
       };
 
       const url = process.env.IA_URL + "/learn";
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-      console.log("IA: ", response);
+      try{
 
-      let realEtc = 0;
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
+        console.log("IA: ", response);
+        
+      }catch(err){
+        console.error("Erro ao enviar dados para IA: ", err);
+      }
+
       // console.log(
       //   "Atualizando registro de irrigação anterior com dados reais...",
       // );
@@ -272,7 +277,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
         const initialVolume =
           lastIrrigation.water_before + lastIrrigation.water_added; //lt
         const lostVolume = initialVolume - water_level;
-        realEtc = parseFloat((lostVolume / plantingBed.area).toFixed(3));
+        const realEtc = parseFloat((lostVolume / plantingBed.area).toFixed(3));
 
         //atualiza o real gasto de etc
       // }
