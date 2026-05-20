@@ -154,21 +154,29 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
 
 const predictEvapotranspiration = async (plantingBed, OWPayload) => {
   try {
-    const PeriodETo = OWPayload.reduce((sum, hour) => {
-      const rs = uviToRs(hour.uvi, 0);// as nuvens já são consideradas na API da Openweather
-      return (
-        sum +
-        penmanMonteithHour({
-          temp: hour.temp,
-          humidity: hour.humidity,
-          wind: hour.wind_speed,
-          rs: rs,
-        })
-      );
-    }, 0);
+    const rsArray = await getNasaPowerData(); //0 - 23
+    let penmannEtoSum = 0;
+
+    for (const hour of OWPayload) {
+      const hourDate = new Date(hour.dt * 1000);
+      const hourOfDay = hourDate.getHours();
+
+      const clearSkyRs = rsArray[hourOfDay] || 0;
+
+      const cloud_factor = Math.max(0.25, 1 - hour.clouds / 100);
+
+      const Rs = clearSkyRs * cloud_factor;
+
+      penmannEtoSum += penmanMonteithHour({
+        temp: hour.temp,
+        humidity: hour.humidity,
+        wind: hour.wind_speed,
+        rs: Rs,
+      });
+    }
 
     const Kc = plantingBed.stage.kc;
-    const ETc = PeriodETo * Kc;
+    const ETc = penmannEtoSum * Kc;
 
     return parseFloat(ETc.toFixed(3));
   } catch (err) {
@@ -225,7 +233,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
         orderBy: {
           date: "desc",
         },
-        take: 1
+        take: 1,
       });
 
       const body = {
@@ -241,8 +249,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
       };
 
       const url = process.env.IA_URL + "/learn";
-      try{
-
+      try {
         const response = await fetch(url, {
           method: "POST",
           headers: {
@@ -251,8 +258,7 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
           body: JSON.stringify(body),
         });
         console.log("IA: ", response);
-        
-      }catch(err){
+      } catch (err) {
         console.error("Erro ao enviar dados para IA: ", err);
       }
 
@@ -274,12 +280,12 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
       // realEtc = sumLastRealEtc._sum.real_etc || 0; //mm do periodo
 
       // if (realEtc === 0) {
-        const initialVolume =
-          lastIrrigation.water_before + lastIrrigation.water_added; //lt
-        const lostVolume = initialVolume - water_level;
-        const realEtc = parseFloat((lostVolume / plantingBed.area).toFixed(3));
+      const initialVolume =
+        lastIrrigation.water_before + lastIrrigation.water_added; //lt
+      const lostVolume = initialVolume - water_level;
+      const realEtc = parseFloat((lostVolume / plantingBed.area).toFixed(3));
 
-        //atualiza o real gasto de etc
+      //atualiza o real gasto de etc
       // }
       await prisma.irrigation.update({
         where: { id: lastIrrigation.id },
@@ -336,6 +342,10 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
 
     if (water_level < plantingBed.field_capacity) {
       necessary_water = necessary_water + predictedEtc * plantingBed.area; // agua necessária pra irrigar + previsão de evapotranspiração  //em Litros
+      console.log(
+        "Evapotranspiração prevista (L): ",
+        predictedEtc * plantingBed.area,
+      );
       //solo com agua acima do necessário
       if (necessary_water <= 0) {
         console.log("Solo saturado, ou com umidade adequada");
@@ -383,9 +393,9 @@ const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
           action = 2;
           finalVolume = necessary_water;
         }
-        necessary_seconds = parseFloat(
-          (finalVolume / plantingBed.flow_rate).toFixed(2),
-        ) + pump_offset; // milissegundos necessários pra irrigar a quantidade de água necessária + segundo de offset
+        necessary_seconds =
+          parseFloat((finalVolume / plantingBed.flow_rate).toFixed(2)) +
+          pump_offset; // milissegundos necessários pra irrigar a quantidade de água necessária + segundo de offset
       }
 
       await prisma.irrigation.create({
@@ -466,6 +476,25 @@ const openWeatherData = async () => {
   }
 };
 
+const getNasaPowerData = async () => {
+  try {
+    const now = new Date();
+    const day = now.getDate().toString();
+    const month = now.getMonth().toString();
+    +1;
+    const year = now.getFullYear().toString() - 1; //ano passado
+
+    const response = await fetch(
+      `https://power.larc.nasa.gov/api/temporal/hourly/point?parameters=CLRSKY_SFC_SW_DWN&community=AG&longitude=${process.env.LONGITUDE}&latitude=${process.env.LATITUDE}&start=${year + month + day}&end=${year + month + day}&format=JSON`,
+    );
+    const data = await response.json();
+    return data.properties.parameter.CLRSKY_SFC_SW_DWN;
+  } catch (err) {
+    console.error("Error fetching NASA POWER data:", err);
+    throw err;
+  }
+};
+
 function penmanMonteithHour({ temp, humidity, wind, rs }) {
   try {
     const gamma = 0.066; //constante psicrométrica, alteração por altitude é irrelevante
@@ -493,6 +522,7 @@ function penmanMonteithHour({ temp, humidity, wind, rs }) {
 
 function uviToRs(uvi, clouds) {
   try {
+    //mesmo com 100% de nuvens, o piso é 25%
     let rs = uvi * 25; // W/m²
     rs = rs * (1 - clouds / 100);
 
@@ -502,4 +532,4 @@ function uviToRs(uvi, clouds) {
     return 0;
   }
 }
-export default { verifyEvapotranspiration };
+export default { verifyEvapotranspiration, getNasaPowerData };
