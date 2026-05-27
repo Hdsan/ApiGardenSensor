@@ -62,16 +62,16 @@ const storeSensorInfos = async (postBody) => {
         };
       })
       .filter(Boolean);
-    const sortedReads = [...readsToCreate].sort(
+    const noAnchorReads = readsToCreate.toSpliced(2, 1);//tira o sensor ancora pra achar o valor de desvio
+    const sortedReads = [...noAnchorReads].sort(
       (a, b) => a.raw_value - b.raw_value, // Ordena pelo RAW
     );
-
-    const anchorAvg = (sortedReads[1].raw_value + sortedReads[2].raw_value) / 2;
+    const anchorAvg = sortedReads[1].raw_value;
     const avgMargin = anchorAvg * 0.2;
 
     const filteredReads = readsToCreate.map((read, i) => {
       const deviation = Math.abs(read.raw_value - anchorAvg);
-      const isValid = deviation <= avgMargin;
+      const isValid = deviation <= avgMargin ||  i == 2;
 
       if (!isValid) {
         console.log(`⚠️ Sensor ${sensors[i].order} Inválido (Outlier)`, {

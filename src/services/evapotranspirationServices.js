@@ -23,13 +23,26 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
           where: { id: read.sensor_id },
         });
         read.is_valid = sensor ? sensor.enabled : false;
+        read.sensor = sensor;
       }),
     );
     //filtro dos registros validos atuais
-    const validReads = reads.filter((read) => read.is_valid === true);
+    const validReads = reads.filter(
+      (read) => read.is_valid === true && read.sensor?.order !== 3,
+    );
+    const underGRead = reads.find(
+      (read) => read.sensor?.order === 3 && read.is_valid === true,
+    );
+    console.log("Sensor de umidade subterrâneo:", underGRead ? underGRead.value : "N/A");
 
-    const avgSensor =
-      validReads.reduce((sum, read) => sum + read.value, 0) / validReads.length;
+    let avgSensor;
+    const surfaceAvg = validReads.reduce((sum, read) => sum + read.value, 0) / validReads.length; // media da superficie
+    if (underGRead) {
+      avgSensor = surfaceAvg * 0.4 + underGRead.value * 0.6; //usa a média ponderada entre o sensor de superfície e o sensor subterrâneo, dando mais peso para o subterrâneo, por ser mais representativo da umidade real disponível para as raízes
+    } else {
+      avgSensor = surfaceAvg; //se o sensor subterrâneo não for válido, usa a média dos sensores de superfície
+    }
+
     const plantingBed = await prisma.planting_bed.findUnique({
       where: { id: plantingBedId },
       include: { stage: true, plant: true },
@@ -40,8 +53,6 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
     const p = plantingBed.plant.depletion_fraction;
 
     const water_percent = avgSensor * 0.01;
-    const TAW = fc - wp;
-    const RAW = TAW * p;
 
     const water_level = parseFloat((water_percent * fc).toFixed(2)); //agua mm no solo
 
@@ -138,12 +149,12 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
 
     //ajuste pra considerar os tempo de dessincronização do esp32
     if (allowedHours(Number(hour), Number(minute))) {
-    return await verifyIrrigation(
-      OWPayload,
-      plantingBed,
-      avgSensor,
-      Number(hour),
-    );
+      return await verifyIrrigation(
+        OWPayload,
+        plantingBed,
+        water_percent,
+        Number(hour),
+      );
     }
     return 0;
   } catch (err) {
@@ -185,13 +196,12 @@ const predictEvapotranspiration = async (plantingBed, OWPayload) => {
   }
 };
 
-const verifyIrrigation = async (OWPayload, plantingBed, avgSensor, hours) => {
+const verifyIrrigation = async (OWPayload, plantingBed, water_percent, hours) => {
   try {
     const fc = plantingBed.field_capacity;
     const wp = plantingBed.wilting_point;
     const p = plantingBed.plant.depletion_fraction;
 
-    const water_percent = avgSensor * 0.01;
     const TAW = fc - wp;
     const RAW = TAW * p;
 
