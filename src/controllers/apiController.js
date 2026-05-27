@@ -1,6 +1,7 @@
 import express from "express";
 const router = express.Router();
 import readServices from "../services/readServices.js";
+import evapotranspirationServices from "../services/evapotranspirationServices.js";
 
 router.post("/soil", async (req, res) => {
   const result = await readServices.storeSensorInfos(req.body);
@@ -27,5 +28,19 @@ const { bedId } = req.body;
 const response = await readServices.teachIrrigationToIA(bedId);
 res.json(response);
 });
+router.post("/schedule", async (req, res) => {
+  const { hour, day, month } = req.body;
+  await evapotranspirationServices.scheduleIrrigation(hour, day, month);
+  return res.json({ status: true, message: "agendado para " + hour + ":00 " + day + "/" + month });
+})
+router.delete("/schedule", async (req, res) => {
+  await evapotranspirationServices.deleteSchedules();
+  return res.json({ status: true, message: "Schedules deletados." });
+})
+router.get("/schedule", async (req, res) => {
+  const schedule = await evapotranspirationServices.getSchedule();
+  return res.json(schedule);
+});
+
 
 export default router;

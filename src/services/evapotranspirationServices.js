@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from "uuid";
 import pkg from "@prisma/client";
 const { PrismaClient } = pkg;
 const prisma = new PrismaClient();
+let schedule = []; // caso alguma irrigação seja perdida, a rota schedule insere uma aqui
 const verifyEvapotranspiration = async (plantingBedId, reads) => {
   try {
     const now = new Date();
@@ -33,10 +34,14 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
     const underGRead = reads.find(
       (read) => read.sensor?.order === 3 && read.is_valid === true,
     );
-    console.log("Sensor de umidade subterrâneo:", underGRead ? underGRead.value : "N/A");
+    console.log(
+      "Sensor de umidade subterrâneo:",
+      underGRead ? underGRead.value : "N/A",
+    );
 
     let avgSensor;
-    const surfaceAvg = validReads.reduce((sum, read) => sum + read.value, 0) / validReads.length; // media da superficie
+    const surfaceAvg =
+      validReads.reduce((sum, read) => sum + read.value, 0) / validReads.length; // media da superficie
     if (underGRead) {
       avgSensor = surfaceAvg * 0.4 + underGRead.value * 0.6; //usa a média ponderada entre o sensor de superfície e o sensor subterrâneo, dando mais peso para o subterrâneo, por ser mais representativo da umidade real disponível para as raízes
     } else {
@@ -196,7 +201,12 @@ const predictEvapotranspiration = async (plantingBed, OWPayload) => {
   }
 };
 
-const verifyIrrigation = async (OWPayload, plantingBed, water_percent, hours) => {
+const verifyIrrigation = async (
+  OWPayload,
+  plantingBed,
+  water_percent,
+  hours,
+) => {
   try {
     const fc = plantingBed.field_capacity;
     const wp = plantingBed.wilting_point;
@@ -460,13 +470,25 @@ const IrrigatedSoil = (hour, minute) => {
   return false;
 };
 const allowedHours = (hour, minute) => {
+  const now = new Date();
+  const day = now.getDate();
+  const month = now.getMonth() + 1;
+
+  try {
+    if (verifySchedule(hour, day, month)) {
+      console.log("Irrigação agendada para este horário.");
+     return true;
+    }
+  } catch (err) {
+    console.error("Erro ao verificar schedule: ", err);
+  }
   // Janela da manhã: 08:55 até 09:59
   const morningWindow = (hour === 8 && minute >= 55) || hour === 9;
 
   // Janela da tarde: 17:55 até 18:59
   const eveningWindow = (hour === 17 && minute >= 55) || hour === 18;
 
-  if (morningWindow || eveningWindow) {
+  if (morningWindow || eveningWindow || verifySchedule(hour, day, month)) {
     return true;
   }
 
@@ -542,4 +564,39 @@ function uviToRs(uvi, clouds) {
     return 0;
   }
 }
-export default { verifyEvapotranspiration, getNasaPowerData };
+function verifySchedule(hour, day, month) {
+  if (
+    schedule.some((s) => s.hour === hour && s.day === day && s.month === month)
+  ) {
+    console.log("Irrigação agendada para este horário.");
+    schedule = schedule.filter(
+      (s) => !(s.hour === hour && s.day === day && s.month === month),
+    );
+    return true;
+  }
+  return false;
+}
+
+function scheduleIrrigation(hour, day, month) {
+  if (
+    schedule.some((s) => s.hour === hour && s.day === day && s.month === month)
+  ) {
+    console.log("Irrigação já agendada para este horário.");
+    return;
+  }
+  schedule.push({ hour, day, month });
+  console.log(schedule);
+}
+function deleteSchedules() {
+  schedule = [];
+}
+function getSchedule() {
+  return schedule;
+}
+export default {
+  verifyEvapotranspiration,
+  getNasaPowerData,
+  scheduleIrrigation,
+  deleteSchedules,
+  getSchedule,
+};
