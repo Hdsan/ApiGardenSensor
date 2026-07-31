@@ -2,7 +2,41 @@ import { v4 as uuidv4 } from "uuid";
 import pkg from "@prisma/client";
 const { PrismaClient } = pkg;
 const prisma = new PrismaClient();
-let schedule = []; // caso alguma irrigação seja perdida, a rota schedule insere uma aqui
+
+let lastActionIndex = 2;
+let last_water_before = -999;
+let last_volume_applied = -999;
+
+class PlantingBedStore {
+  constructor() {
+    this.plantingBeds = new Map();
+  }
+
+  set(plantingBed) {
+    if (plantingBed?.id) {
+      this.plantingBeds.set(plantingBed.id, plantingBed);
+    }
+  }
+
+  get(plantingBedId) {
+    return this.plantingBeds.get(plantingBedId);
+  }
+
+  has(plantingBedId) {
+    return this.plantingBeds.has(plantingBedId);
+  }
+
+  delete(plantingBedId) {
+    return this.plantingBeds.delete(plantingBedId);
+  }
+
+  clear() {
+    this.plantingBeds.clear();
+  }
+}
+
+const plantingBedStore = new PlantingBedStore();
+
 const verifyEvapotranspiration = async (plantingBedId, reads) => {
   try {
     const now = new Date();
@@ -52,6 +86,7 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
       where: { id: plantingBedId },
       include: { stage: true, plant: true },
     });
+    plantingBedStore.set(plantingBed);
     const fc = plantingBed.field_capacity;
     const wp = plantingBed.wilting_point;
     const V = plantingBed.volume;
@@ -150,7 +185,6 @@ const verifyEvapotranspiration = async (plantingBedId, reads) => {
         real_etc: null,
       },
     });
-    console.log("Previsão de evapotranspiração (mm): ", newEtcRecord);
 
     //ajuste pra considerar os tempo de dessincronização do esp32
     if (allowedHours(Number(hour), Number(minute))) {
@@ -200,6 +234,349 @@ const predictEvapotranspiration = async (plantingBed, OWPayload) => {
     throw err;
   }
 };
+const verifyIrrigationTraining = async (
+  WC,
+  plantingBedId,
+  ETc,
+  air_temperature,
+  air_humidity,
+  isFirst,
+  isLast,
+  stage,
+) => {
+  try {
+    let plantingBed = plantingBedStore.get(plantingBedId);
+    if (!plantingBed) {
+      plantingBed = await prisma.planting_bed.findUnique({
+        where: { id: plantingBedId },
+        select: {
+          field_capacity: true,
+          wilting_point: true,
+          area: true,
+          volume: true,
+          plant: { select: { depletion_fraction: true } },
+        },
+      });
+      plantingBedStore.set(plantingBed);
+    }
+    console.log(WC + " " + stage);
+
+    const fc = plantingBed.field_capacity;
+    const wp = plantingBed.wilting_point;
+    const p = plantingBed.plant.depletion_fraction;
+    const water_percent = WC * 0.01;
+
+    const TAW = fc - wp;
+    const RAW = TAW * p;
+
+    const water_level = parseFloat(
+      (water_percent * plantingBed.volume).toFixed(3),
+    ); //agua ml no solo
+
+    const raw_inferior_level = fc - RAW;
+    const margin = 0.1 * RAW; //margem de segurança de 10% da água facilmente disponível
+    let target_water_level = raw_inferior_level + margin; //nivel agua ideal (RAW + margem)
+    let necessary_water = target_water_level - water_level; //quantia necessária pra irrigar até o ideal
+
+    const predictedEtcLiters = ETc * plantingBed.area;
+
+    //não aprende se for o primeiro registro, não tem referencia
+    if (!isFirst) {
+      const body = {
+        moisture_before: last_water_before, //
+        hour_before: 9,
+        temp: air_temperature,
+        air_humidity: air_humidity,
+        action_idx: lastActionIndex,
+        volume_applied: last_volume_applied, //
+        moisture_after: water_level,
+        hour_after: 9,
+        target_raw: target_water_level,
+        stage: stage,
+      };
+
+      const url = process.env.IA_URL + "/learn";
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
+        // console.log("IA: ", response);
+      } catch (err) {
+        console.error("Erro ao ensinar IA: ", err);
+      }
+    }
+    if (isLast) {
+      //se for o último encerra por aqui
+      return 0;
+    }
+
+    let action = 2; // 2 = sem interferencia da IA
+    let finalVolume = necessary_water;
+
+    if (water_level < plantingBed.field_capacity) {
+      necessary_water = necessary_water + predictedEtcLiters; // agua pra irrigar até o ideal + previsão de ETc
+
+      if (necessary_water <= 0) {
+        //solo com agua acima do necessário
+        necessary_water = 0;
+        finalVolume = 0;
+        last_water_before = water_level;
+        last_volume_applied = 0;
+        lastActionIndex = 2;
+      } else {
+        //solo com agua abaixo do necessário, acionar a IA
+        try {
+          //post pra /decide
+          const body = {
+            moisture: water_level,
+            hour: 9,
+            temp: air_temperature,
+            air_humidity: air_humidity,
+            volume_ab: necessary_water,
+            stage: stage,
+          };
+          const url = process.env.IA_URL + "/decide";
+          const IAresponse = await fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body),
+          });
+          const IaData = await IAresponse.json();
+          action = IaData.action_idx;
+          finalVolume = parseFloat(
+            (IaData.volume_final / plantingBed.area).toFixed(3),
+          ); // converter de L para mm
+          lastActionIndex = action;
+          last_water_before = water_level;
+          last_volume_applied = finalVolume;
+        } catch (err) {
+          finalVolume = parseFloat(
+            (necessary_water / plantingBed.area).toFixed(3),
+          ); // converter de L para mm
+          last_water_before = water_level;
+          last_volume_applied = finalVolume;
+          lastActionIndex = 2;
+        }
+      }
+      return finalVolume;
+    }
+    return 0;
+  } catch (err) {
+    console.error("Erro ao calcular irrigação:", err);
+    throw err;
+  }
+};
+
+const verifyIrrigationPenmann = async (
+  WC, // %
+  plantingBedId,
+  ETc, // mm
+) => {
+  try {
+    let plantingBed = plantingBedStore.get(plantingBedId);
+    if (!plantingBed) {
+      plantingBed = await prisma.planting_bed.findUnique({
+        where: { id: plantingBedId },
+        select: {
+          field_capacity: true,
+          wilting_point: true,
+          area: true,
+          volume: true,
+          plant: { select: { depletion_fraction: true } },
+        },
+      });
+      plantingBedStore.set(plantingBed);
+    }
+
+    const fc = plantingBed.field_capacity; // Litros
+    const wp = plantingBed.wilting_point; // Litros
+    const p = plantingBed.plant.depletion_fraction;
+    const water_percent = WC * 0.01; // decimal 0.xx
+
+    const TAW = fc - wp; // Litros
+    const RAW = TAW * p; // Litros
+
+    const water_level = parseFloat(
+      (water_percent * plantingBed.volume).toFixed(3),
+    ); // Litros
+    console.log("Nível de água no solo (L):", water_level);
+
+    const raw_inferior_level = fc - RAW; // Litros
+    const margin = 0.1 * RAW;
+    let target_water_level = raw_inferior_level + margin; // Litros
+    let necessary_water = target_water_level - water_level; // Litros
+
+    const predictedEtc = ETc; // mm
+
+    if (water_level < plantingBed.field_capacity) {
+      necessary_water = necessary_water + predictedEtc * plantingBed.area; // L
+      if (necessary_water < 0) {
+        return 0;
+      }
+      return necessary_water / plantingBed.area; // Retorna perfeitamente em mm
+    }
+    return 0;
+  } catch (err) {
+    console.error("Erro ao calcular irrigação:", err);
+    throw err;
+  }
+};
+
+const calculateReward = async (
+  WC, // %
+  index,
+  plantingBedId,
+  air_temperature,
+  air_humidity,
+  stage,
+  volume_applied, // mm (Recebido perfeitamente em mm do Python agora!)
+  moisture_before, // %
+) => {
+  console.log(`Calculando reward para WC pós-rega: ${WC}%`);
+
+  let plantingBed = plantingBedStore.get(plantingBedId);
+  if (!plantingBed) {
+    plantingBed = await prisma.planting_bed.findUnique({
+      where: { id: plantingBedId },
+      select: {
+        field_capacity: true,
+        wilting_point: true,
+        area: true,
+        volume: true,
+        plant: { select: { depletion_fraction: true } },
+      },
+    });
+    plantingBedStore.set(plantingBed);
+  }
+
+  const fc = plantingBed.field_capacity; // litros
+  const wp = plantingBed.wilting_point; // litros
+  const p = plantingBed.plant.depletion_fraction;
+  const volume = plantingBed.volume; // litros
+
+  const TAW = fc - wp; // litros
+  const RAW = TAW * p; // litros
+  const water_percent = WC * 0.01; // decimal 0.xx
+
+  const water_level = parseFloat(
+    (water_percent * plantingBed.volume).toFixed(3),
+  );  // litros
+
+  const raw_inferior_level = fc - RAW; // litros
+  const margin = 0.1 * RAW; // litros
+  let target_water_level = raw_inferior_level + margin; // litros
+  
+  // Sincronizado: mm * área_m² = Litros exatos aplicados
+  const volume_appliedLiters = volume_applied * plantingBed.area;
+  const moisture_before_perc = (moisture_before * 0.01) * volume; 
+
+  const body = {
+    moisture_before: moisture_before_perc, // Litros
+    temp: air_temperature,
+    air_humidity: air_humidity,
+    action_idx: index, 
+    volume_applied: volume_appliedLiters, // Litros
+    moisture_after: water_level, // Litros
+    target_raw: target_water_level, // litros
+    stage: stage,
+  };
+
+  const url = process.env.IA_URL + "/learn";
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    return data.reward;
+  } catch (err) {
+    console.error("Erro ao ensinar IA na rota /reward: ", err);
+    return 0.0;
+  }
+};
+
+const changeHistoryValues = async (
+  WC,
+  index,
+  plantingBedId,
+  air_temperature,
+  air_humidity,
+  stage,
+  volume_applied,
+) => {
+  let lastActionIndex = 2;
+  let last_water_before = -999;
+  let last_volume_applied = -999;
+  console.log(WC);
+  let plantingBed = plantingBedStore.get(plantingBedId);
+  if (!plantingBed) {
+    plantingBed = await prisma.planting_bed.findUnique({
+      where: { id: plantingBedId },
+      select: {
+        field_capacity: true,
+        wilting_point: true,
+        area: true,
+        volume: true,
+        plant: { select: { depletion_fraction: true } },
+      },
+    });
+    plantingBedStore.set(plantingBed);
+  }
+
+  const fc = plantingBed.field_capacity;
+  const wp = plantingBed.wilting_point;
+  const p = plantingBed.plant.depletion_fraction;
+  const volumeApplied = volume_applied;
+
+  const TAW = fc - wp;
+  const RAW = TAW * p;
+  const water_percent = WC * 0.01;
+
+  const water_level = parseFloat(
+    (water_percent * plantingBed.volume).toFixed(3),
+  ); //agua ml no solo
+
+  const raw_inferior_level = fc - RAW;
+  const margin = 0.1 * RAW;
+  let target_water_level = raw_inferior_level + margin;
+
+  const body = {
+    moisture_before: last_water_before,
+    hour_before: 9,
+    temp: air_temperature,
+    air_humidity: air_humidity,
+    action_idx: index,
+    volume_applied: volume_applied,
+    moisture_after: water_level,
+    hour_after: 9,
+    target_raw: target_water_level,
+    stage: stage,
+  };
+
+  const url = process.env.IA_URL + "/learn";
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    return data.reward;
+  } catch (err) {
+    console.error("Erro ao ensinar IA: ", err);
+  }
+};
 
 const verifyIrrigation = async (
   OWPayload,
@@ -208,6 +585,21 @@ const verifyIrrigation = async (
   hours,
 ) => {
   try {
+    let plantingBed = plantingBedStore.get(plantingBedId);
+    if (!plantingBed) {
+      plantingBed = await prisma.planting_bed.findUnique({
+        where: { id: plantingBedId },
+        select: {
+          field_capacity: true,
+          wilting_point: true,
+          area: true,
+          volume: true,
+          plant: { select: { depletion_fraction: true } },
+        },
+      });
+      plantingBedStore.set(plantingBed);
+    }
+
     const fc = plantingBed.field_capacity;
     const wp = plantingBed.wilting_point;
     const p = plantingBed.plant.depletion_fraction;
@@ -277,7 +669,6 @@ const verifyIrrigation = async (
           },
           body: JSON.stringify(body),
         });
-        console.log("IA: ", response);
       } catch (err) {
         console.error("Erro ao enviar dados para IA: ", err);
       }
@@ -477,7 +868,7 @@ const allowedHours = (hour, minute) => {
   try {
     if (verifySchedule(hour, day, month)) {
       console.log("Irrigação agendada para este horário.");
-     return true;
+      return true;
     }
   } catch (err) {
     console.error("Erro ao verificar schedule: ", err);
@@ -512,8 +903,7 @@ const getNasaPowerData = async () => {
   try {
     const now = new Date();
     const day = now.getDate().toString();
-    const month = now.getMonth().toString();
-    +1;
+    const month = now.getMonth().toString() + 1;
     const year = now.getFullYear().toString() - 1; //ano passado
 
     const response = await fetch(
@@ -595,6 +985,9 @@ function getSchedule() {
 }
 export default {
   verifyEvapotranspiration,
+  verifyIrrigationTraining,
+  verifyIrrigationPenmann,
+  calculateReward,
   getNasaPowerData,
   scheduleIrrigation,
   deleteSchedules,
