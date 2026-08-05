@@ -1,0 +1,14 @@
+# API de Gateway e Coleta  (`irrigation-gateway-api`)
+
+## O que o projeto faz
+API backend responsável por receber e armazenar os dados de telemetria enviados pelos sensores do ESP32 na horta (umidade do solo, temperatura e umidade), gerenciar a comunicação com a API de IA, e registrar o histórico de acionamentos de irrigação no banco de dados.
+
+## Como roda
+
+1. Instale as dependências:
+    ```bash
+      npm install
+
+2. Execute o comando:
+    ```bash
+      npm run start

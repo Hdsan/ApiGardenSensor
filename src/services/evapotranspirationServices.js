@@ -304,7 +304,6 @@ const verifyIrrigationTraining = async (
           },
           body: JSON.stringify(body),
         });
-        // console.log("IA: ", response);
       } catch (err) {
         console.error("Erro ao ensinar IA: ", err);
       }
@@ -673,31 +672,13 @@ const verifyIrrigation = async (
         console.error("Erro ao enviar dados para IA: ", err);
       }
 
-      // console.log(
-      //   "Atualizando registro de irrigação anterior com dados reais...",
-      // );
-      // const sumLastRealEtc = await prisma.evapotranspiration.aggregate({
-      //   where: {
-      //     bed_id: plantingBed.id,
-      //     date: {
-      //       gte: new Date(Date.now() - lastPeriodHours * 60 * 60 * 1000),
-      //     },
-      //   },
-      //   _sum: {
-      //     real_etc: true,
-      //   },
-      // });
-      // console.log(sumLastRealEtc);
-      // realEtc = sumLastRealEtc._sum.real_etc || 0; //mm do periodo
-
-      // if (realEtc === 0) {
       const initialVolume =
         lastIrrigation.water_before + lastIrrigation.water_added; //lt
       const lostVolume = initialVolume - water_level;
       const realEtc = parseFloat((lostVolume / plantingBed.area).toFixed(3));
 
       //atualiza o real gasto de etc
-      // }
+
       await prisma.irrigation.update({
         where: { id: lastIrrigation.id },
         data: {
